@@ -167,7 +167,7 @@ class Train(object):
 
 if __name__ == '__main__':
     batch_size = BATCH_CNT * args.gpu_count
-    strategy = tf.distribute.MirroredStrategy()#devices=['/device:GPU:{}'.format(i) for i in range(args.gpu_count)])
+    strategy = tf.distribute.MirroredStrategy(devices=['/device:GPU:{}'.format(i) for i in range(args.gpu_count)])
     print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
 
     set_dir()
