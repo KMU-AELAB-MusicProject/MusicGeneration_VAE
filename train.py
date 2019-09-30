@@ -125,7 +125,7 @@ class Train(object):
         loss += self.mse_loss_fn(train_data, outputs) * 0.6
         loss -= 0.5 * tf.reduce_mean(z_var - tf.square(z_mean) - tf.exp(z_var) + 1.)
 
-        return tf.nn.compute_average_loss(loss, global_batch_size=GLOBAL_BATCH_SIZE)
+        return tf.nn.compute_average_loss(loss, global_batch_size=self.batch_size)
 
     def train_step(self, inputs):
         train_data, pre_phrase, position_number = inputs
@@ -167,12 +167,12 @@ class Train(object):
 
 if __name__ == '__main__':
     batch_size = BATCH_CNT * args.gpu_count
-    strategy = tf.distribute.MirroredStrategy(devices=['/device:GPU:{}'.format(i) for i in range(args.gpu_count)])
+    strategy = tf.distribute.MirroredStrategy()#devices=['/device:GPU:{}'.format(i) for i in range(args.gpu_count)])
     print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
 
     set_dir()
     dataset = set_data(strategy, batch_size)
-
-    trainer = Train(batch_size, strategy, set_model())
+    model, ckpt, manager = set_model()
+    trainer = Train(batch_size, strategy, model, ckpt, manager)
 
     trainer.train(dataset, strategy)

@@ -10,14 +10,10 @@ from tensorflow.keras import layers
 
 
 class Encoder(layers.Layer):
-    def __init__(self, **kwargs):
-        kwargs['autocast'] = False
-        kwargs['name'] = 'phrase_encoder'
-        super(Encoder, self).__init__(**kwargs)
+    def __init__(self):
+        super(Encoder, self).__init__(name='phrase_encoder')
 
     def call(self, inputs):
-        tf.keras.backend.set_floatx('float64')
-
         x = layers.Reshape(target_shape=[384, 96, 1])(inputs)
         # pitch feature
         x1 = layers.Conv2D(filters=32, kernel_size=[1, 12], strides=[1, 2], activation='relu', padding='same')(x)
@@ -71,5 +67,5 @@ class Encoder(layers.Layer):
         z_mean = layers.Dense(510)(x5)
         z_var = layers.Dense(510)(x5)
 
-        eps = tf.random.normal(shape=tf.shape(z_mean), dtype=tf.float64)
+        eps = tf.random.normal(shape=tf.shape(z_mean), dtype=tf.float32)
         return (eps * tf.exp(z_var * .5) + z_mean), z_mean, z_var   # z, z-mean, z-var

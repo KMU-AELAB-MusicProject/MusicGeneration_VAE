@@ -11,21 +11,15 @@ from .decoder import Decoder
 
 
 class PhraseModel(tf.keras.Model):
-    """Combines the encoder and decoder into an end-to-end model for training."""
-
-    def __init__(self, **kwargs):
-        kwargs['autocast'] = False
-        kwargs['name'] = 'phrase_model'
-        super(PhraseModel, self).__init__(**kwargs)
+    def __init__(self):
+        super(PhraseModel, self).__init__(name='phrase_model')
         self.encoder = Encoder()
         self.decoder = Decoder()
 
         self.phrase_number = tf.Variable(name='phrase_number', trainable=True,
-                                         initial_value=tf.random.normal(shape=[331, 510], stddev=0.5, dtype=tf.float64))
+                                         initial_value=tf.random.normal(shape=[331, 510], stddev=0.5, dtype=tf.float32))
 
     def call(self, train_data, pre_phrase, position_number):
-        tf.keras.backend.set_floatx('float64')
-
         z, z_mean, z_var = self.encoder(train_data)  # train-phrase
         z_pre, _, _ = self.encoder(pre_phrase)  # pre-phrase
 
@@ -33,10 +27,10 @@ class PhraseModel(tf.keras.Model):
                                                                   tf.cast(position_number, dtype=tf.int32)))
 
         reshape_logits = layers.Reshape(target_shape=[384, 96])(logits)
-        binary_note = tf.cast(tf.keras.backend.greater(reshape_logits, 0.35), dtype=tf.float64)
-        outputs = tf.keras.layers.multiply([binary_note, reshape_logits], dtype=tf.float64)
+        binary_note = tf.cast(tf.keras.backend.greater(reshape_logits, 0.35), dtype=tf.float32)
+        outputs = tf.keras.layers.multiply([binary_note, reshape_logits], dtype=tf.float32)
 
-        return outputs, binary_note, z, z_mean, z_var, tf.cast(tf.keras.backend.greater(train_data, 0.35), dtype=tf.float64)
+        return outputs, binary_note, z, z_mean, z_var, tf.cast(tf.keras.backend.greater(train_data, 0.35), dtype=tf.float32)
 
     def get_feature(self, input):
         z, _, _ = self.encoder(input)

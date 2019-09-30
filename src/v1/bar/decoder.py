@@ -14,8 +14,6 @@ class Decoder(layers.Layer):
         super(Decoder, self).__init__(name='bar_decoder')
 
     def call(self, inputs):
-        tf.keras.backend.set_floatx('float64')
-
         x = layers.Reshape(target_shape=[1, 1, 510])(inputs)
 
         x1_1 = layers.Conv2DTranspose(filters=510, kernel_size=[6, 6], activation='relu')(x)

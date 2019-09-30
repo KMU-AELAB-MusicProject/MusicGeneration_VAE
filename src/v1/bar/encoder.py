@@ -14,8 +14,6 @@ class Encoder(layers.Layer):
         super(Encoder, self).__init__(name='bar_encoder')
 
     def call(self, inputs):
-        tf.keras.backend.set_floatx('float64')
-
         x = layers.Reshape(target_shape=[96, 96, 1])(inputs)
         # pitch feature
         x1 = layers.Conv2D(filters=32, kernel_size=[1, 12], strides=[1, 2], activation='relu', padding='same')(x)

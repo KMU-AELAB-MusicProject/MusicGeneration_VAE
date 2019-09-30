@@ -10,14 +10,10 @@ from tensorflow.keras import layers
 
 
 class Decoder(layers.Layer):
-    def __init__(self, **kwargs):
-        kwargs['autocast'] = False
-        kwargs['name'] = 'phrase_decoder'
-        super(Decoder, self).__init__(**kwargs)
+    def __init__(self):
+        super(Decoder, self).__init__(name='phrase_decoder')
 
     def call(self, inputs):
-        tf.keras.backend.set_floatx('float64')
-
         x = layers.Reshape(target_shape=[1, 1, 510])(inputs)
 
         x1_1 = layers.Conv2DTranspose(filters=510, kernel_size=[24, 6], activation='relu')(x)
