@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="022dd53d-d665-4b72-ac77-cadcc29c6fd0" name="qwer" url="http://203.246.113.171">
+        <fileTransfer host="203.246.113.171" port="22" rootFolder="/home/algorithm/Music" accessType="SFTP">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" />
+          </advancedOptions>
+          <option name="port" value="22" />
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
