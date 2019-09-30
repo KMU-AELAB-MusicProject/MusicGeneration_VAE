@@ -37,7 +37,7 @@ def get_data_from_filename(filename):
 
 def get_data_wrapper(filename):
     train_data, pre_phrase, position_number = tf.py_function(get_data_from_filename, [filename],
-                                                             (tf.float64, tf.float64, tf.int32))
+                                                             (tf.float32, tf.float32, tf.int32))
     if args.train_phrase:
         train_data.set_shape([None, 384, 96])
     else:
