@@ -50,14 +50,15 @@ def get_data_wrapper(filename):
 
 def set_data(strategy, batch_size):
     with strategy.scope():
-        if args.train_phrase:
-            file_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(11)]
-        else:
-            file_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(11)]
+        # if args.train_phrase:
+        #     file_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(11)]
+        # else:
+        #     file_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(11)]
 
         # Create dataset of filenames.
-        dataset = tf.data.Dataset.from_tensor_slices(file_list)
-        dataset = dataset.flat_map(get_data_wrapper).batch(batch_size)
+        data = np.load(os.path.join(DATA_PATH, 'phrase_data', 'phrase_data0.npz'))
+        dataset = tf.data.Dataset.from_tensor_slices((data['train_data'], data['pre_phrase'], data['position_number']))
+        # dataset = dataset.flat_map(get_data_wrapper).batch(batch_size)
         dataset = dataset.shuffle(10000).batch(batch_size)
     return strategy.experimental_distribute_dataset(dataset)
 
@@ -65,35 +66,34 @@ def set_model():
     phrase_model_path = os.path.join(MODEL_SAVE_PATH, 'phrase')
     bar_model_path = os.path.join(MODEL_SAVE_PATH, 'bar')
 
-    with strategy.scope():
-        optimizer = tf.keras.optimizers.Adam(1e-4)
+    optimizer = tf.keras.optimizers.Adam(1e-4)
 
-        if args.train_phrase:
+    if args.train_phrase:
+        model = PhraseModel()
+        ckpt = tf.train.Checkpoint(optimizer=optimizer, model=model)
+        manager = tf.train.CheckpointManager(ckpt, phrase_model_path, max_to_keep=50)
+        if args.load_model:
+            if args.model_number:
+                ckpt.restore(manager.latest_checkpoint)  # ....
+            else:
+                ckpt.restore(manager.latest_checkpoint)
+
+    else:
+        if args.load_model:
+            model = BarModel(PhraseModel())
+            ckpt = tf.train.Checkpoint(optimizer=optimizer, model=model)
+            manager = tf.train.CheckpointManager(ckpt, bar_model_path, max_to_keep=50)
+
+            ckpt.restore(manager.latest_checkpoint)  # ...
+        else:
             model = PhraseModel()
             ckpt = tf.train.Checkpoint(optimizer=optimizer, model=model)
             manager = tf.train.CheckpointManager(ckpt, phrase_model_path, max_to_keep=50)
-            if args.load_model:
-                if args.model_number:
-                    ckpt.restore(manager.latest_checkpoint)  # ....
-                else:
-                    ckpt.restore(manager.latest_checkpoint)
 
-        else:
-            if args.load_model:
-                model = BarModel(PhraseModel())
-                ckpt = tf.train.Checkpoint(optimizer=optimizer, model=model)
-                manager = tf.train.CheckpointManager(ckpt, bar_model_path, max_to_keep=50)
-
-                ckpt.restore(manager.latest_checkpoint)  # ...
-            else:
-                model = PhraseModel()
-                ckpt = tf.train.Checkpoint(optimizer=optimizer, model=model)
-                manager = tf.train.CheckpointManager(ckpt, phrase_model_path, max_to_keep=50)
-
-                ckpt.restore(manager.latest_checkpoint)  # ...
-                model = BarModel(model)
-                ckpt = tf.train.Checkpoint(optimizer=optimizer, model=model)
-                manager = tf.train.CheckpointManager(ckpt, bar_model_path, max_to_keep=50)
+            ckpt.restore(manager.latest_checkpoint)  # ...
+            model = BarModel(model)
+            ckpt = tf.train.Checkpoint(optimizer=optimizer, model=model)
+            manager = tf.train.CheckpointManager(ckpt, bar_model_path, max_to_keep=50)
 
     return model, ckpt, manager
 
@@ -132,9 +132,9 @@ class Train(object):
         with tf.GradientTape() as tape:
             outputs, binary_note, z, z_mean, z_var, td_binary = self.model(train_data, pre_phrase, position_number)
             loss = self.compute_loss(train_data, outputs, binary_note, z_mean, z_var, td_binary)
+
         gradients = tape.gradient(loss, self.model.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients,
-                                           self.model.trainable_variables))
+        self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
         return loss
 
     def train(self, dataset, strategy):
@@ -172,7 +172,9 @@ if __name__ == '__main__':
 
     set_dir()
     dataset = set_data(strategy, batch_size)
-    model, ckpt, manager = set_model()
-    trainer = Train(batch_size, strategy, model, ckpt, manager)
+    with strategy.scope():
+        model, ckpt, manager = set_model()
+        print(model.trainable_variables)
+        trainer = Train(batch_size, strategy, model, ckpt, manager)
 
-    trainer.train(dataset, strategy)
+        trainer.train(dataset, strategy)

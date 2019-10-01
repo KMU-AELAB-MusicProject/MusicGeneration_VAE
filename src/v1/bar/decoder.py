@@ -19,22 +19,20 @@ class Decoder(layers.Layer):
         x1_1 = layers.Conv2DTranspose(filters=510, kernel_size=[6, 6], activation='relu')(x)
 
         # pitch-time extend
-        x1_2_1 = layers.Conv2DTranspose(filters=510, kernel_size=[1, 3], strides=[1, 3], activation='relu',
+        x1_2_1 = layers.Conv2DTranspose(filters=510, kernel_size=[1, 6], strides=[1, 6], activation='relu',
                                         padding='same')(x)
-        x1_2_2 = layers.Conv2DTranspose(filters=510, kernel_size=[12, 1], strides=[12, 1], activation='relu',
+        x1_2_2 = layers.Conv2DTranspose(filters=510, kernel_size=[6, 1], strides=[6, 1], activation='relu',
                                         padding='same')(x1_2_1)
 
-        x1_2 = layers.Conv2DTranspose(filters=510, kernel_size=[3, 3], strides=[2, 2], activation='relu',
-                                      padding='same')(x1_2_2)
+        x1_2 = layers.Conv2D(filters=510, kernel_size=[1, 1], strides=[1, 1], activation='relu', padding='same')(x1_2_2)
 
         # time-pitch extend
-        x1_3_1 = layers.Conv2DTranspose(filters=510, kernel_size=[12, 1], strides=[12, 1], activation='relu',
+        x1_3_1 = layers.Conv2DTranspose(filters=510, kernel_size=[6, 1], strides=[6, 1], activation='relu',
                                         padding='same')(x)
-        x1_3_2 = layers.Conv2DTranspose(filters=510, kernel_size=[1, 3], strides=[1, 3], activation='relu',
+        x1_3_2 = layers.Conv2DTranspose(filters=510, kernel_size=[1, 6], strides=[1, 6], activation='relu',
                                         padding='same')(x1_3_1)
 
-        x1_3 = layers.Conv2DTranspose(filters=510, kernel_size=[3, 3], strides=[2, 2], activation='relu',
-                                      padding='same')(x1_3_2)
+        x1_3 = layers.Conv2D(filters=510, kernel_size=[1, 1], strides=[1, 1], activation='relu', padding='same')(x1_3_2)
 
         x2 = x1_1 + x1_2 + x1_3 # [6, 6, 510]
 

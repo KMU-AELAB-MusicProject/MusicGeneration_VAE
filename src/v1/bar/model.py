@@ -24,7 +24,7 @@ class BarModel(tf.keras.Model):
         z, z_mean, z_var = self.encoder(train_data)  # train-phrase
         z_pre, _, _ = self.phrase_model.encoder(pre_phrase)  # pre-phrase
 
-        logits = self.decoder(z + z_pre + tf.keras.backend.gather(self.bar_number, position_number, dtype=tf.int32))
+        logits = self.decoder(z + z_pre + tf.keras.backend.gather(self.bar_number, position_number))
 
         cond = tf.keras.backend.greater_equal(logits, 0.3)
         outputs = tf.keras.layers.multiply([tf.cast(cond, dtype=tf.float32), logits])

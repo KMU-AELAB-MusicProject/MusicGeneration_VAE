@@ -4,6 +4,7 @@ import pickle
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
+from tensorflow.keras.layers import Conv2D, Reshape, concatenate, AveragePooling2D, GRU, multiply
 
 # from config import *
 from .encoder import Encoder
@@ -23,12 +24,11 @@ class PhraseModel(tf.keras.Model):
         z, z_mean, z_var = self.encoder(train_data)  # train-phrase
         z_pre, _, _ = self.encoder(pre_phrase)  # pre-phrase
 
-        logits = self.decoder(z + z_pre + tf.keras.backend.gather(self.phrase_number,
-                                                                  tf.cast(position_number, dtype=tf.int32)))
+        logits = self.decoder(z + z_pre + tf.keras.backend.gather(self.phrase_number, position_number))
 
-        reshape_logits = layers.Reshape(target_shape=[384, 96])(logits)
+        reshape_logits = Reshape(target_shape=[384, 96])(logits)
         binary_note = tf.cast(tf.keras.backend.greater(reshape_logits, 0.35), dtype=tf.float32)
-        outputs = tf.keras.layers.multiply([binary_note, reshape_logits], dtype=tf.float32)
+        outputs = multiply([binary_note, reshape_logits], dtype=tf.float32)
 
         return outputs, binary_note, z, z_mean, z_var, tf.cast(tf.keras.backend.greater(train_data, 0.35), dtype=tf.float32)
 
@@ -43,5 +43,6 @@ class PhraseModel(tf.keras.Model):
 
 if __name__ == '__main__':
     t = PhraseModel()
-    t.build((10, 384, 96), (10, 384, 96), (10))
-    t.summary()
+    # t.compile()
+    # t.build((10, 384, 96), (10, 384, 96), (10))
+    # t.summary()
