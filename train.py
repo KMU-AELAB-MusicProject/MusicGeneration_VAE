@@ -57,9 +57,9 @@ def set_data(strategy, batch_size):
 
         # Create dataset of filenames.
         data = np.load(os.path.join(DATA_PATH, 'phrase_data', 'phrase_data0.npz'))
-        dataset = tf.data.Dataset.from_tensor_slices((data['train_data'], data['pre_phrase'], data['position_number']))
+        dataset = tf.data.Dataset.from_tensor_slices((data['train_data'], data['pre_phrase'], data['position_number'])).batch(batch_size)
         # dataset = dataset.flat_map(get_data_wrapper).batch(batch_size)
-        dataset = dataset.shuffle(10000).batch(batch_size)
+        # dataset = dataset.shuffle(10000).batch(batch_size)
     return strategy.experimental_distribute_dataset(dataset)
 
 def set_model():
