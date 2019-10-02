@@ -77,19 +77,19 @@ def data_maker():
                     bar_data[2].append(idx)
                     idx = (idx + 1) % 4
 
-        if len(phrase_data[0]) > 8400:
+        if len(phrase_data[0]) > 120:
             np.savez_compressed(os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(file_num)),
-                                train_data=phrase_data[0][:8400], pre_phrase=phrase_data[1][:8400],
-                                position_number=phrase_data[2][:8400])
+                                train_data=phrase_data[0][:120], pre_phrase=phrase_data[1][:120],
+                                position_number=phrase_data[2][:120])
             phrase_flag = False
-            phrase_data = [phrase_data[0][8400:], phrase_data[1][8400:], phrase_data[2][8400:]]
+            phrase_data = [phrase_data[0][120:], phrase_data[1][120:], phrase_data[2][120:]]
 
-        if len(bar_data[0]) > 33600:
+        if len(bar_data[0]) > 480:
             np.savez_compressed(os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(file_num)),
-                                train_data=bar_data[0][:33600], pre_phrase=bar_data[1][:33600],
-                                position_number=bar_data[2][:33600])
+                                train_data=bar_data[0][:480], pre_phrase=bar_data[1][:480],
+                                position_number=bar_data[2][:480])
             bar_flag = False
-            bar_data = [bar_data[0][33600:], bar_data[1][33600:], bar_data[2][33600:]]
+            bar_data = [bar_data[0][480:], bar_data[1][480:], bar_data[2][480:]]
 
             file_num += 1
 
