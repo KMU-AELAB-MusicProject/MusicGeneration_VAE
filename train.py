@@ -1,5 +1,6 @@
 import os
 import time
+import h5py
 import argparse
 
 import numpy as np
@@ -16,6 +17,16 @@ parser.add_argument('--model_number', type=int, default=0, help="The GPU device 
 parser.add_argument('--gpu_count', type=int, default=1, help="The GPU device number to use.")
 
 args = parser.parse_args()
+
+
+class generator:
+    def __init__(self, file):
+        self.file = file
+
+    def __call__(self):
+        with h5py.File(self.file, 'r') as hf:
+            for im in hf["train_img"]:
+                yield im
 
 
 def set_dir():
@@ -56,9 +67,10 @@ def set_data(strategy, batch_size):
             file_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(11)]
 
         # Create dataset of filenames.
-        dataset = tf.data.Dataset.from_tensor_slices(file_list)
+        fp = h5py.File(os.path.join(DATA_PATH, 'phrase_data.hdf5'), 'r')
+        dataset = tf.data.Dataset.from_tensor_slices((fp['train_data'], fp['pre_phrase'], fp['position_number'])).\
+            shuffle(10000).batch(batch_size)
         dataset = dataset.flat_map(get_data_wrapper)
-        dataset = dataset.shuffle(10000).batch(batch_size)
     return strategy.experimental_distribute_dataset(dataset)
 
 def set_model():
