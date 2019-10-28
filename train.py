@@ -41,36 +41,11 @@ def set_dir():
         os.mkdir(os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v1'))
 
 
-def get_data_from_filename(filename):
-    data = np.load(filename)
-    return data['train_data'], data['pre_phrase'], data['position_number']
-
-
-def get_data_wrapper(filename):
-    train_data, pre_phrase, position_number = tf.py_function(get_data_from_filename, [filename],
-                                                             (tf.float32, tf.float32, tf.int32))
-    if args.train_phrase:
-        train_data.set_shape([None, 384, 96])
-    else:
-        train_data.set_shape([None, 96, 96])
-    pre_phrase.set_shape([None, 384, 96])
-    position_number.set_shape([None, 1])
-
-    return tf.data.Dataset.from_tensor_slices((train_data, pre_phrase, position_number))
-
-
-def set_data(strategy, batch_size):
+def set_data(strategy, batch_size, file):
     with strategy.scope():
-        if args.train_phrase:
-            file_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(11)]
-        else:
-            file_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(11)]
-
-        # Create dataset of filenames.
-        fp = h5py.File(os.path.join(DATA_PATH, 'phrase_data.hdf5'), 'r')
-        dataset = tf.data.Dataset.from_tensor_slices((fp['train_data'], fp['pre_phrase'], fp['position_number'])).\
-            shuffle(10000).batch(batch_size)
-        dataset = dataset.flat_map(get_data_wrapper)
+        with np.load(file) as data:
+            dataset = tf.data.Dataset.from_tensor_slices((data['train_data'], data['pre_phrase'], data['position_number'])).\
+                shuffle(10000).batch(batch_size)
     return strategy.experimental_distribute_dataset(dataset)
 
 def set_model():
@@ -114,7 +89,7 @@ class Train(object):
         self.epochs = TRAIN_EPOCH
         self.batch_size = batch_size
 
-        self.best_loss = 9999999
+        self.best_loss = 99999999
         self.not_learning_cnt = 0
 
         self.lr = 1e-3
@@ -148,7 +123,7 @@ class Train(object):
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
         return loss
 
-    def train(self, dataset, strategy):
+    def train(self, strategy):
         def distributed_train_epoch(ds):
             total_loss = 0.0
             num_train_batches = 0.0
@@ -160,16 +135,24 @@ class Train(object):
 
         distributed_train_epoch = tf.function(distributed_train_epoch)
 
+        if args.train_phrase:
+            file_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(11)]
+        else:
+            file_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(11)]
+
         for epoch in range(self.epochs):
             self.decay()
             self.optimizer.learning_rate = self.lr
+            total_loss = 0.
 
-            loss = distributed_train_epoch(dataset)
+            for file in file_list:
+                dataset = set_data(self.strategy, batch_size, file)
+                total_loss += distributed_train_epoch(dataset)
 
-            print("{} Epoch's loss: {}".format(epoch, loss))
+            print("{} Epoch's loss: {}".format(epoch, total_loss))
 
-            if loss < self.best_loss:
-                self.best_loss = loss
+            if total_loss < self.best_loss:
+                self.best_loss = total_loss
                 save_path = self.manager.save()
                 print("Saved checkpoint for step {}: {}".format(int(self.ckpt.step), save_path))
 
@@ -184,7 +167,6 @@ if __name__ == '__main__':
     set_dir()
     with strategy.scope():
         model, ckpt, manager = set_model()
-        dataset = set_data(strategy, batch_size)
 
         trainer = Train(batch_size, strategy, model, ckpt, manager)
-        trainer.train(dataset, strategy)
+        trainer.train(strategy)

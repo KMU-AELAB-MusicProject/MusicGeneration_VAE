@@ -79,20 +79,20 @@ def data_maker():
                     bar_data[2].append(idx)
                     idx = (idx + 1) % 4
 
-        while len(phrase_data[0]) > 30:
+        while len(phrase_data[0]) > 6000:
             np.savez_compressed(os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(file_num1)),
-                                train_data=phrase_data[0][:30], pre_phrase=phrase_data[1][:30],
-                                position_number=phrase_data[2][:30])
+                                train_data=phrase_data[0][:6000], pre_phrase=phrase_data[1][:6000],
+                                position_number=np.reshape(phrase_data[2][:6000], [-1, 1]))
             phrase_flag = False
-            phrase_data = [phrase_data[0][30:], phrase_data[1][30:], phrase_data[2][30:]]
+            phrase_data = [phrase_data[0][6000:], phrase_data[1][6000:], phrase_data[2][6000:]]
             file_num1 += 1
 
-        while len(bar_data[0]) > 120:
+        while len(bar_data[0]) > 24000:
             np.savez_compressed(os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(file_num2)),
-                                train_data=bar_data[0][:120], pre_phrase=bar_data[1][:120],
-                                position_number=bar_data[2][:120])
+                                train_data=bar_data[0][:24000], pre_phrase=bar_data[1][:24000],
+                                position_number=np.reshape(bar_data[2][:24000], [-1, 1]))
             bar_flag = False
-            bar_data = [bar_data[0][120:], bar_data[1][120:], bar_data[2][120:]]
+            bar_data = [bar_data[0][24000:], bar_data[1][24000:], bar_data[2][24000:]]
             file_num2 += 1
 
         index += 1
@@ -103,12 +103,14 @@ def data_maker():
     else:
         if phrase_flag:
             np.savez_compressed(os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(file_num1)),
-                                train_data=phrase_data[0], pre_phrase=phrase_data[1], position_number=phrase_data[2])
+                                train_data=phrase_data[0], pre_phrase=phrase_data[1],
+                                position_number=np.reshape(phrase_data[2], [-1, 1]))
             del phrase_data
 
         if bar_flag:
             np.savez_compressed(os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(file_num2)),
-                                train_data=bar_data[0], pre_phrase=bar_data[1], position_number=bar_data[2])
+                                train_data=bar_data[0], pre_phrase=bar_data[1],
+                                position_number=np.reshape(bar_data[2], [-1, 1]))
             del bar_data
 
         sys.stdout.flush()
@@ -153,64 +155,6 @@ def converter(file):
         print(e)
         return None
 
-def test():
-    # size = 0
-    # for file in os.listdir(os.path.join(DATA_PATH, 'bar_data')):
-    #     with np.load(os.path.join(DATA_PATH, 'bar_data', file)) as data:
-    #         size += len(data['train_data'])
-    #
-    # idx = 0
-    # cnt = 1
-    # with h5py.File(os.path.join(DATA_PATH, 'bar_data.hdf5'), 'w') as h5:
-    #     h5.create_dataset('train_data', (size, 96, 96), dtype='float32', chunks=True)
-    #     h5.create_dataset('pre_phrase', (size, 384, 96), dtype='float32', chunks=True)
-    #     h5.create_dataset('position_number', (size,), dtype='float32', chunks=True)
-    #
-    #     merged1 = h5['train_data']
-    #     merged2 = h5['pre_phrase']
-    #     merged3 = h5['position_number']
-    #     for file in os.listdir(os.path.join(DATA_PATH, 'bar_data')):
-    #         print(cnt, file)
-    #         with np.load(os.path.join(DATA_PATH, 'bar_data', file)) as data:
-    #             chk1 = data['train_data']
-    #             chk2 = data['pre_phrase']
-    #             chk3 = data['position_number']
-    #
-    #             merged1[idx:idx + len(chk1)] = chk1
-    #             merged2[idx:idx + len(chk1)] = chk2
-    #             merged3[idx:idx + len(chk1)] = chk3
-    #             idx += len(chk1)
-    #             cnt += 1
-
-    size = 0
-    for file in os.listdir(os.path.join(DATA_PATH, 'phrase_data')):
-        with np.load(os.path.join(DATA_PATH, 'phrase_data', file)) as data:
-            size += len(data['train_data'])
-
-    idx = 0
-    cnt = 1
-    with h5py.File(os.path.join(DATA_PATH, 'phrase_data.hdf5'), 'w') as h5:
-        h5.create_dataset('train_data', (size, 384, 96), dtype='float32', chunks=True)
-        h5.create_dataset('pre_phrase', (size, 384, 96), dtype='float32', chunks=True)
-        h5.create_dataset('position_number', (size,), dtype='float32', chunks=True)
-
-        merged1 = h5['train_data']
-        merged2 = h5['pre_phrase']
-        merged3 = h5['position_number']
-        for file in os.listdir(os.path.join(DATA_PATH, 'phrase_data')):
-            print(cnt, file)
-            with np.load(os.path.join(DATA_PATH, 'phrase_data', file)) as data:
-                chk1 = data['train_data']
-                chk2 = data['pre_phrase']
-                chk3 = data['position_number']
-
-                merged1[idx:idx + len(chk1)] = chk1
-                merged2[idx:idx + len(chk1)] = chk2
-                merged3[idx:idx + len(chk1)] = chk3
-                idx += len(chk1)
-                cnt += 1
-
-
 def main():
     # if not os.path.exists(os.path.join(DATA_PATH, 'np')):
     #     os.mkdir(os.path.join(DATA_PATH, 'np'))
@@ -242,9 +186,8 @@ def main():
     #
     # with open(os.path.join(DATA_PATH, 'midi_info.pkl'), 'wb') as fp:
     #     pickle.dump(midi_info, fp)
-    #
-    # data_maker()
-    test()
+
+    data_maker()
 
 
 if __name__ == "__main__":
