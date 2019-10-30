@@ -13,6 +13,7 @@ from tensorflow.keras.layers import Conv2D, Reshape, concatenate, AveragePooling
 class Decoder(layers.Layer):
     def __init__(self):
         super(Decoder, self).__init__(name='phrase_decoder')
+        tf.keras.backend.set_floatx('float64')
 
         self.x1_1 = Conv2DTranspose(filters=510, kernel_size=[24, 6], activation='relu')
 

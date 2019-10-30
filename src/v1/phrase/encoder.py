@@ -13,6 +13,7 @@ from tensorflow.keras.layers import Conv2D, Reshape, concatenate, AveragePooling
 class Encoder(layers.Layer):
     def __init__(self):
         super(Encoder, self).__init__(name='phrase_encoder')
+        tf.keras.backend.set_floatx('float64')
 
         self.x1 = Conv2D(filters=32, kernel_size=[1, 12], strides=[1, 2], activation='relu', padding='same')
         self.x1_1 = Conv2D(filters=32, kernel_size=[4, 1], strides=[2, 1], activation='relu', padding='same')
@@ -86,5 +87,5 @@ class Encoder(layers.Layer):
         z_mean = self.mean(x5)
         z_var = self.var(x5)
 
-        eps = tf.random.normal(shape=tf.shape(z_mean), dtype=tf.float32)
+        eps = tf.random.normal(shape=tf.shape(z_mean), dtype=tf.float64)
         return (eps * tf.exp(z_var * .5) + z_mean), z_mean, z_var   # z, z-mean, z-var

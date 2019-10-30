@@ -19,16 +19,6 @@ parser.add_argument('--gpu_count', type=int, default=1, help="The GPU device num
 args = parser.parse_args()
 
 
-class generator:
-    def __init__(self, file):
-        self.file = file
-
-    def __call__(self):
-        with h5py.File(self.file, 'r') as hf:
-            for im in hf["train_img"]:
-                yield im
-
-
 def set_dir():
     if not os.path.exists(os.path.join(ROOT_PATH, BOARD_PATH)):
         os.mkdir(os.path.join(ROOT_PATH, BOARD_PATH))
@@ -44,8 +34,10 @@ def set_dir():
 def set_data(strategy, batch_size, file):
     with strategy.scope():
         with np.load(file) as data:
-            dataset = tf.data.Dataset.from_tensor_slices((data['train_data'], data['pre_phrase'], data['position_number'])).\
-                shuffle(10000).batch(batch_size)
+            dataset = tf.data.Dataset.\
+                from_tensor_slices((data['train_data'], data['pre_phrase'], data['position_number'])).\
+                shuffle(10000).\
+                batch(batch_size)
     return strategy.experimental_distribute_dataset(dataset)
 
 def set_model():
