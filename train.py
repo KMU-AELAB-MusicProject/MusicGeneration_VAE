@@ -98,6 +98,7 @@ class Train(object):
         if self.not_learning_cnt > 3:
             self.lr /= 2
 
+    @tf.function
     def compute_loss(self, train_data, outputs, binary_note, z_mean, z_var, td_binary):
         loss = self.mse_loss_fn(td_binary, binary_note) * 0.4
         loss += self.mse_loss_fn(train_data, outputs) * 0.6
@@ -117,8 +118,8 @@ class Train(object):
 
     def train(self, strategy):
         def distributed_train_epoch(ds):
-            total_loss = 0.0
-            num_train_batches = 0.0
+            total_loss = np.float64(0.0)
+            num_train_batches = np.float64(0.0)
             for one_batch in ds:
                 per_replica_loss = strategy.experimental_run_v2(self.train_step, args=(one_batch,))
                 total_loss += strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_loss, axis=None)
@@ -128,9 +129,9 @@ class Train(object):
         distributed_train_epoch = tf.function(distributed_train_epoch)
 
         if args.train_phrase:
-            file_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(11)]
+            file_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(80)]
         else:
-            file_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(11)]
+            file_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(80)]
 
         for epoch in range(self.epochs):
             self.decay()
@@ -152,6 +153,7 @@ class Train(object):
 
 
 if __name__ == '__main__':
+    tf.keras.backend.set_floatx('float64')
     batch_size = BATCH_CNT * args.gpu_count
     strategy = tf.distribute.MirroredStrategy(devices=['/device:GPU:{}'.format(i) for i in range(args.gpu_count)])
     print('Number of devices: {}'.format(strategy.num_replicas_in_sync))

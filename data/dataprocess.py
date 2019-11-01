@@ -67,6 +67,7 @@ def data_maker():
             data = np.append(data, np.take(note_data, [i for i in range(17, 113)], axis=-1), axis=0)
 
             # phrase/pre-phrase/phrase-number
+            print(np.array(phrase_data[0]).shape)
             phrase_data[0].extend(data[1:])
             phrase_data[1].extend(data[:-1])
             phrase_data[2].extend(number_data)
@@ -78,7 +79,7 @@ def data_maker():
                     bar_data[1].append(data[d-1])
                     bar_data[2].append(idx)
                     idx = (idx + 1) % 4
-
+            print(np.array(bar_data[0]).shape)
         while len(phrase_data[0]) > 6000:
             np.savez_compressed(os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(file_num1)),
                                 train_data=phrase_data[0][:6000], pre_phrase=phrase_data[1][:6000],

@@ -75,16 +75,8 @@ class Encoder(layers.Layer):
             x4 = self.x4_1(x4)
             x4 = Reshape(target_shape=[510])(x4)
 
-        # GRU feature extract
-        with tf.name_scope('GRU_feature'):
-            xr = self.xr_fit(x1)
-            xr = layers.Reshape(target_shape=[384, 48])(xr)
-            xr = self.xr(xr)
-
-        x5 =concatenate([x4, xr], axis=1)
-
-        z_mean = self.mean(x5)
-        z_var = self.var(x5)
+        z_mean = self.mean(x4)
+        z_var = self.var(x4)
 
         eps = tf.random.normal(shape=tf.shape(z_mean), dtype=tf.float64)
         return (eps * tf.exp(z_var * .5) + z_mean), z_mean, z_var   # z, z-mean, z-var

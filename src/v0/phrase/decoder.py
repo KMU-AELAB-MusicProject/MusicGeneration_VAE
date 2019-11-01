@@ -57,15 +57,6 @@ class Decoder(layers.Layer):
         x5 = self.x5(x4)
         x6 = self.x6(x5)
 
-        # GRU feature extract
-        with tf.name_scope('GRU'):
-            xr = self.xr_transpose(x5)
-            xr = self.xr_fit(xr)
-            xr = Reshape(target_shape=[384, 48])(xr)
-            xr = self.xr(xr)
-            xr = Reshape([384, 96, 1])(xr)
-
-        x7 = concatenate([x6, xr], axis=3)
-        logits = self.logit_fit(x7)
+        logits = self.logit_fit(x6)
 
         return logits
