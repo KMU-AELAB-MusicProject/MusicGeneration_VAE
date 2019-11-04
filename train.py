@@ -1,22 +1,22 @@
 import os
 import time
 import argparse
+import importlib
 
 import numpy as np
 import tensorflow as tf
 
-from src.v1.phrase.model import PhraseModel
-from src.v1.bar.model import BarModel
 from config import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--train_phrase', help="Train Classifier model before train vae.", action='store_true')
 parser.add_argument('--load_model', help="The train number number to start train.", action='store_true')
 parser.add_argument('--model_number', type=int, default=1, help="The GPU device number to use.")
-parser.add_argument('--gpu_number', type=int, default=1, help="The GPU device number to use.")
+parser.add_argument('--gpu_number', type=str, help="The GPU device number to use.")
 
 args = parser.parse_args()
 
+os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_number
 
 def set_dir():
     if not os.path.exists(os.path.join(ROOT_PATH, BOARD_PATH)):
@@ -95,6 +95,7 @@ class Train(object):
             train_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(75)]
             test_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(75, 77)]
 
+        print('################### start train ###################')
         for epoch in range(self.epochs):
             self.decay()
             self.optimizer.learning_rate = self.lr
@@ -129,10 +130,12 @@ if __name__ == '__main__':
     set_dir()
 
     if args.train_phrase:
-        model = PhraseModel()
+        import_model = importlib.import_module('src.v{}.phrase.model'.format(args.model_number))
+        model = import_model.PhraseModel()
         model_path = os.path.join(os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number)), 'phrase')
     else:
-        model = BarModel()
+        import_model = importlib.import_module('src.v{}.bar.model'.format(args.model_number))
+        model = import_model.BareModel()
         model_path = os.path.join(os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number)), 'bar')
 
     trainer = Train(model, model_path)
