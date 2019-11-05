@@ -107,7 +107,7 @@ class Train(object):
                         outputs, binary_note, z, z_mean, z_var, td_binary = self.model(train_data, pre_phrase,
                                                                                        position_number)
                         output = outputs
-                return output
+            return output
 
         batch = tf.function(batch)
         test = tf.function(test)
@@ -154,10 +154,10 @@ class Train(object):
             outputs = []
             pre_phrase = np.zeros([1, 384, 96], dtype=np.float64)
             for idx in range(3):
-                pre_phrase = self.model.test(pre_phrase, np.array([idx], dtype=np.float64))
+                pre_phrase = self.model.test(pre_phrase, np.array([[idx]], dtype=np.float64))
                 outputs.append(pre_phrase)
             with self.summary_writer.as_default():
-                tf.summary.image('output', np.array(outputs), step=epoch)
+                tf.summary.image('output', np.array(outputs).shape([-1, 384, 96, 1]), step=epoch)
 
             print("{} Epoch's loss: [train_loss: {} | test_loss: {}] ---- time: {}".format(epoch, train_loss, test_loss,
                                                                                            train_time))
