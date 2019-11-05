@@ -160,7 +160,7 @@ class Train(object):
                 pre_phrase = self.model.test(pre_phrase, np.array([[idx]], dtype=np.float64))
                 outputs.append(pre_phrase)
             with self.summary_writer.as_default():
-                tf.summary.image('output', np.array(outputs).shape([-1, 384, 96, 1]), step=epoch)
+                tf.summary.image('output', np.array(outputs).reshape([-1, 384, 96, 1]), step=epoch)
 
             # --------------------------------------------
             print("{} Epoch's loss: [train_loss: {} | test_loss: {}] ---- time: {}".format(epoch, train_loss, test_loss,
