@@ -39,6 +39,13 @@ def set_data(file, batch_size):
         dataset = dataset.prefetch(4)
     return dataset
 
+def set_data_test(file, batch_size):
+    with np.load(file) as data:
+        dataset = tf.data.Dataset.from_tensor_slices(
+            (data['train_data'][:batch_size], data['pre_phrase'][:batch_size], data['position_number'][:batch_size])).\
+            batch(batch_size)
+    return dataset
+
 
 class Train(object):
     def __init__(self, model, save_path, board_path):
@@ -72,40 +79,38 @@ class Train(object):
         return loss
 
     def train(self):
-        def train_batch(ds):
+        def batch(ds, isTrain=True):
             batch_loss = np.float64(0.0)
             num_train_batches = np.float64(0.0)
             for one_batch in ds:
-                train_data, pre_phrase, position_number = one_batch
                 with tf.device('/device:GPU:0'):
                     with tf.GradientTape() as tape:
+                        train_data, pre_phrase, position_number = one_batch
                         outputs, binary_note, z, z_mean, z_var, td_binary = self.model(train_data, pre_phrase,
                                                                                        position_number)
                         loss = self.compute_loss(train_data, outputs, binary_note, z_mean, z_var, td_binary)
 
-                    gradients = tape.gradient(loss, self.model.trainable_variables)
-                    self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+                    if isTrain:
+                        gradients = tape.gradient(loss, self.model.trainable_variables)
+                        self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
                 batch_loss += loss
                 num_train_batches += 1
-            return batch_loss / num_train_batches, outputs
+            return batch_loss / num_train_batches
 
-        def test_batch(ds):
-            batch_loss = np.float64(0.0)
-            num_train_batches = np.float64(0.0)
+        def test(ds):
+            output = np.zeros([10, 10, 3])
             for one_batch in ds:
-                train_data, pre_phrase, position_number = one_batch
                 with tf.device('/device:GPU:0'):
-                    outputs, binary_note, z, z_mean, z_var, td_binary = self.model(train_data, pre_phrase,
-                                                                                   position_number)
-                    loss = self.compute_loss(train_data, outputs, binary_note, z_mean, z_var, td_binary)
+                    with tf.GradientTape() as tape:
+                        train_data, pre_phrase, position_number = one_batch
+                        outputs, binary_note, z, z_mean, z_var, td_binary = self.model(train_data, pre_phrase,
+                                                                                       position_number)
+                        output = outputs
+                return output
 
-                batch_loss += loss
-                num_train_batches += 1
-            return batch_loss / num_train_batches, outputs
-
-        train_batch = tf.function(train_batch)
-        test_batch = tf.function(test_batch)
+        batch = tf.function(batch)
+        test = tf.function(test)
 
         if args.train_phrase:
             train_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(75)]
@@ -120,35 +125,39 @@ class Train(object):
             self.optimizer.learning_rate = self.lr
 
             train_loss = 0.
-            train_output = []
             train_time = time.time()
             random.shuffle(train_list)
             for file in train_list[:int(len(train_list) * 0.7)]:
-                dataset, outputs = set_data(file, BATCH_SIZE)
-                train_output.append(outputs[3])
-                train_loss += train_batch(dataset)
+                dataset = set_data(file, BATCH_SIZE)
+                train_loss += batch(dataset)
             train_time = time.time() - train_time
             with self.summary_writer.as_default():
                 tf.summary.scalar('train_loss', train_loss, step=epoch)
-                tf.summary.image('train_output', train_output, step=epoch)
 
             test_loss = 0.
-            test_output = []
             for file in test_list:
-                dataset, outputs = set_data(file, BATCH_SIZE)
-                test_output.append(outputs[3])
-                test_loss += test_batch(dataset)
+                dataset = set_data_test(file, BATCH_SIZE)
+                test_loss += batch(dataset, False)
             with self.summary_writer.as_default():
                 tf.summary.scalar('test_loss', test_loss, step=epoch)
-                tf.summary.image('test_output', test_output, step=epoch)
+
+            dataset = set_data_test(train_list[0], BATCH_SIZE)
+            output = test(dataset)
+            with self.summary_writer.as_default():
+                tf.summary.image('train_output', output, step=epoch)
+
+            dataset = set_data(test_list[0], BATCH_SIZE)
+            output = test(dataset)
+            with self.summary_writer.as_default():
+                tf.summary.image('test_output', output, step=epoch)
 
             outputs = []
-            pre_phrase = np.zeros([384, 96], dtype=np.float64)
+            pre_phrase = np.zeros([1, 384, 96], dtype=np.float64)
             for idx in range(3):
-                pre_phrase = self.model.test(pre_phrase, [idx])
+                pre_phrase = self.model.test(pre_phrase, np.array([idx], dtype=np.float64))
                 outputs.append(pre_phrase)
             with self.summary_writer.as_default():
-                tf.summary.image('output', outputs, step=epoch)
+                tf.summary.image('output', np.array(outputs), step=epoch)
 
             print("{} Epoch's loss: [train_loss: {} | test_loss: {}] ---- time: {}".format(epoch, train_loss, test_loss,
                                                                                            train_time))
