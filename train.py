@@ -124,6 +124,7 @@ class Train(object):
             self.decay()
             self.optimizer.learning_rate = self.lr
 
+            # ---------------- train step ----------------
             train_loss = 0.
             train_time = time.time()
             random.shuffle(train_list)
@@ -134,6 +135,7 @@ class Train(object):
             with self.summary_writer.as_default():
                 tf.summary.scalar('train_loss', train_loss, step=epoch)
 
+            # ---------------- test step ----------------
             test_loss = 0.
             for file in test_list:
                 dataset = set_data_test(file, BATCH_SIZE)
@@ -141,6 +143,7 @@ class Train(object):
             with self.summary_writer.as_default():
                 tf.summary.scalar('test_loss', test_loss, step=epoch)
 
+            # ---------------- piano-roll generation step ----------------
             dataset = set_data_test(train_list[0], BATCH_SIZE)
             output = test(dataset)
             with self.summary_writer.as_default():
@@ -159,6 +162,7 @@ class Train(object):
             with self.summary_writer.as_default():
                 tf.summary.image('output', np.array(outputs).shape([-1, 384, 96, 1]), step=epoch)
 
+            # --------------------------------------------
             print("{} Epoch's loss: [train_loss: {} | test_loss: {}] ---- time: {}".format(epoch, train_loss, test_loss,
                                                                                            train_time))
 
@@ -166,7 +170,7 @@ class Train(object):
                 self.best_loss = test_loss
                 if epoch > 10:
                     save_path = self.manager.save()
-                    print("Saved checkpoint for step {}: {}".format(int(self.ckpt.step), save_path))
+                    print("Saved checkpoint for epoch {}: {}".format(epoch, save_path))
 
         return True
 
