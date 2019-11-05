@@ -81,7 +81,6 @@ class Train(object):
     def train(self):
         def batch(ds, isTrain=True):
             batch_loss = np.float64(0.0)
-            num_train_batches = np.float64(0.0)
             for one_batch in ds:
                 with tf.device('/device:GPU:0'):
                     with tf.GradientTape() as tape:
@@ -95,8 +94,7 @@ class Train(object):
                         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
                 batch_loss += loss
-                num_train_batches += 1
-            return batch_loss / num_train_batches
+            return batch_loss
 
         def test(ds):
             output = np.zeros([10, 10, 3])
@@ -133,7 +131,7 @@ class Train(object):
                 train_loss += batch(dataset)
             train_time = time.time() - train_time
             with self.summary_writer.as_default():
-                tf.summary.scalar('train_loss', train_loss, step=epoch)
+                tf.summary.scalar('train_loss', train_loss / int(len(train_list) * 0.7), step=epoch)
 
             # ---------------- test step ----------------
             test_loss = 0.
@@ -141,7 +139,7 @@ class Train(object):
                 dataset = set_data_test(file, BATCH_SIZE)
                 test_loss += batch(dataset, False)
             with self.summary_writer.as_default():
-                tf.summary.scalar('test_loss', test_loss, step=epoch)
+                tf.summary.scalar('test_loss', test_loss / len(test_list), step=epoch)
 
             # ---------------- piano-roll generation step ----------------
             dataset = set_data_test(train_list[0], BATCH_SIZE)
