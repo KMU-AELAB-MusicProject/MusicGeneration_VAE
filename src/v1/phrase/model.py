@@ -28,17 +28,22 @@ class PhraseModel(tf.keras.Model):
         binary_note = tf.cast(tf.keras.backend.greater(reshape_logits, 0.35), dtype=tf.float64)
         outputs = multiply([binary_note, reshape_logits], dtype=tf.float64)
 
-        return outputs, binary_note, z, z_mean, z_var, tf.cast(tf.keras.backend.greater(train_data, 0.35),
-                                                               dtype=tf.float64)
+        return Reshape(target_shape=[384, 96,1])(outputs), binary_note, z, z_mean, z_var, \
+               tf.cast(tf.keras.backend.greater(train_data, 0.35), dtype=tf.float64)
 
     def get_feature(self, input):
         z, _, _ = self.encoder(input)
         return z
 
-    def make_music(self, pre_phrase, position_number):
-        self.decoder(self.encoder(pre_phrase) + tf.keras.backend.gather(self.phrase_number, position_number) +
-                     tf.random.normal(shape=(1, 510)))
-        return
+    def test(self, pre_phrase, position_number):
+        logits = self.decoder(self.encoder(pre_phrase) + tf.random.normal(shape=(1, 510)) +
+                              Reshape(target_shape=[510])(self.phrase_number(position_number)))
+
+        reshape_logits = Reshape(target_shape=[384, 96])(logits)
+        binary_note = tf.cast(tf.keras.backend.greater(reshape_logits, 0.35), dtype=tf.float64)
+        outputs = multiply([binary_note, reshape_logits], dtype=tf.float64)
+
+        return Reshape(target_shape=[384, 96,1])(outputs)
 
 
 if __name__ == '__main__':

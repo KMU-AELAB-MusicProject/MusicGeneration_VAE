@@ -1,5 +1,6 @@
 import os
 import time
+import random
 import argparse
 import importlib
 
@@ -22,23 +23,25 @@ def set_dir():
     if not os.path.exists(os.path.join(ROOT_PATH, BOARD_PATH)):
         os.mkdir(os.path.join(ROOT_PATH, BOARD_PATH))
         time.sleep(0.1)
-        os.mkdir(os.path.join(ROOT_PATH, BOARD_PATH, 'phrase'))
-        os.mkdir(os.path.join(ROOT_PATH, BOARD_PATH, 'bar'))
+        os.mkdir(os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'phrase'))
+        os.mkdir(os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'bar'))
     if not os.path.exists(os.path.join(ROOT_PATH, MODEL_SAVE_PATH)):
         os.mkdir(os.path.join(ROOT_PATH, MODEL_SAVE_PATH))
         time.sleep(0.1)
-        os.mkdir(os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number)))
+        os.mkdir(os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'phrase'))
+        os.mkdir(os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'bar'))
 
 
 def set_data(file, batch_size):
     with np.load(file) as data:
         dataset = tf.data.Dataset.from_tensor_slices(
             (data['train_data'], data['pre_phrase'], data['position_number'])).shuffle(10000).batch(batch_size)
+        dataset = dataset.prefetch(4)
     return dataset
 
 
 class Train(object):
-    def __init__(self, model, model_path):
+    def __init__(self, model, save_path, board_path):
         self.epochs = TRAIN_EPOCH
 
         self.best_loss = 99999999
@@ -50,13 +53,15 @@ class Train(object):
         self.optimizer = tf.keras.optimizers.Adam(1e-3)
 
         self.ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=model)
-        self.manager = tf.train.CheckpointManager(self.ckpt, model_path, max_to_keep=50)
+        self.manager = tf.train.CheckpointManager(self.ckpt, save_path, max_to_keep=50)
+
+        self.summary_writer = tf.summary.create_file_writer(board_path)
 
         self.model = model
 
     def decay(self):
         if self.not_learning_cnt > 3:
-            self.lr /= 2
+            self.lr *= 0.7
 
     @tf.function
     def compute_loss(self, train_data, outputs, binary_note, z_mean, z_var, td_binary):
@@ -68,25 +73,39 @@ class Train(object):
 
     def train(self):
         def train_batch(ds):
-            def train_step(inputs):
-                train_data, pre_phrase, position_number = inputs
-                with tf.GradientTape() as tape:
+            batch_loss = np.float64(0.0)
+            num_train_batches = np.float64(0.0)
+            for one_batch in ds:
+                train_data, pre_phrase, position_number = one_batch
+                with tf.device('/device:GPU:0'):
+                    with tf.GradientTape() as tape:
+                        outputs, binary_note, z, z_mean, z_var, td_binary = self.model(train_data, pre_phrase,
+                                                                                       position_number)
+                        loss = self.compute_loss(train_data, outputs, binary_note, z_mean, z_var, td_binary)
+
+                    gradients = tape.gradient(loss, self.model.trainable_variables)
+                    self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+
+                batch_loss += loss
+                num_train_batches += 1
+            return batch_loss / num_train_batches, outputs
+
+        def test_batch(ds):
+            batch_loss = np.float64(0.0)
+            num_train_batches = np.float64(0.0)
+            for one_batch in ds:
+                train_data, pre_phrase, position_number = one_batch
+                with tf.device('/device:GPU:0'):
                     outputs, binary_note, z, z_mean, z_var, td_binary = self.model(train_data, pre_phrase,
                                                                                    position_number)
                     loss = self.compute_loss(train_data, outputs, binary_note, z_mean, z_var, td_binary)
 
-                gradients = tape.gradient(loss, self.model.trainable_variables)
-                self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
-                return loss
-
-            batch_loss = np.float64(0.0)
-            num_train_batches = np.float64(0.0)
-            for one_batch in ds:
-                batch_loss += train_step(one_batch)
+                batch_loss += loss
                 num_train_batches += 1
-            return batch_loss / num_train_batches
+            return batch_loss / num_train_batches, outputs
 
         train_batch = tf.function(train_batch)
+        test_batch = tf.function(test_batch)
 
         if args.train_phrase:
             train_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(75)]
@@ -96,28 +115,47 @@ class Train(object):
             test_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(75, 77)]
 
         print('################### start train ###################')
-        for epoch in range(self.epochs):
+        for epoch in range(1, self.epochs + 1):
             self.decay()
             self.optimizer.learning_rate = self.lr
 
-            train_time = time.time()
             train_loss = 0.
-            for file in train_list:
-                dataset = set_data(file, 32)
+            train_output = []
+            train_time = time.time()
+            random.shuffle(train_list)
+            for file in train_list[:int(len(train_list) * 0.7)]:
+                dataset, outputs = set_data(file, BATCH_SIZE)
+                train_output.append(outputs[3])
                 train_loss += train_batch(dataset)
             train_time = time.time() - train_time
+            with self.summary_writer.as_default():
+                tf.summary.scalar('train_loss', train_loss, step=epoch)
+                tf.summary.image('train_output', train_output, step=epoch)
 
             test_loss = 0.
+            test_output = []
             for file in test_list:
-                dataset = set_data(file, 32)
-                test_loss += train_batch(dataset)
+                dataset, outputs = set_data(file, BATCH_SIZE)
+                test_output.append(outputs[3])
+                test_loss += test_batch(dataset)
+            with self.summary_writer.as_default():
+                tf.summary.scalar('test_loss', test_loss, step=epoch)
+                tf.summary.image('test_output', test_output, step=epoch)
+
+            outputs = []
+            pre_phrase = np.zeros([384, 96], dtype=np.float64)
+            for idx in range(3):
+                pre_phrase = self.model.test(pre_phrase, [idx])
+                outputs.append(pre_phrase)
+            with self.summary_writer.as_default():
+                tf.summary.image('output', outputs, step=epoch)
 
             print("{} Epoch's loss: [train_loss: {} | test_loss: {}] ---- time: {}".format(epoch, train_loss, test_loss,
                                                                                            train_time))
 
             if test_loss < self.best_loss:
                 self.best_loss = test_loss
-                if epoch > 100:
+                if epoch > 10:
                     save_path = self.manager.save()
                     print("Saved checkpoint for step {}: {}".format(int(self.ckpt.step), save_path))
 
@@ -132,11 +170,13 @@ if __name__ == '__main__':
     if args.train_phrase:
         import_model = importlib.import_module('src.v{}.phrase.model'.format(args.model_number))
         model = import_model.PhraseModel()
-        model_path = os.path.join(os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number)), 'phrase')
+        save_path = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number), 'phrase')
+        board_path = os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'phrase')
     else:
         import_model = importlib.import_module('src.v{}.bar.model'.format(args.model_number))
         model = import_model.BareModel()
-        model_path = os.path.join(os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number)), 'bar')
+        save_path = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number), 'bar')
+        board_path = os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'bar')
 
-    trainer = Train(model, model_path)
+    trainer = Train(model, save_path, board_path)
     trainer.train()

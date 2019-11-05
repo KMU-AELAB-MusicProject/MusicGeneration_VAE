@@ -41,7 +41,7 @@ class Decoder(Layer):
         self.xr = GRU(units=96, return_sequences=True, recurrent_initializer='glorot_uniform',
                       kernel_regularizer=L1L2(l1=0.003, l2=0.003))
 
-        self.logit_fit = Conv2D(filters=1, kernel_size=[1, 1], strides=[1, 1], padding='same',
+        self.logit_fit = Conv2D(filters=1, kernel_size=[1, 1], strides=[1, 1], activation='sigmoid', padding='same',
                                 kernel_regularizer=L1L2(l1=0.003, l2=0.003))
 
     def call(self, input):
