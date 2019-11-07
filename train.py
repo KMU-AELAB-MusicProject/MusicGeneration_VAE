@@ -162,8 +162,8 @@ class Train(object):
                 tf.summary.image('output', np.array(outputs).reshape([-1, 384, 96, 1]), step=epoch)
 
             # --------------------------------------------
-            print("{} Epoch's loss: [train_loss: {} | test_loss: {}] ---- time: {}".format(epoch, train_loss, test_loss,
-                                                                                           train_time))
+            print("{} Epoch's loss: [train_loss: {:.5f} | test_loss: {:.5f}] ---- time: {:.5f} | lr: {:.8f}".
+                  format(epoch, train_loss, test_loss, train_time, self.lr))
 
             if test_loss < self.best_loss:
                 self.not_learning_cnt = 0

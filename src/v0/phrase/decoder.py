@@ -20,14 +20,17 @@ class Decoder(Layer):
         self.x2 = Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], activation='relu', padding='same',
                          kernel_regularizer=L1L2(l1=0.003, l2=0.003))
 
-        self.x3 = Conv2DTranspose(filters=128, kernel_size=[12, 1], strides=[12, 1], activation='relu',
+        self.x3 = Conv2DTranspose(filters=128, kernel_size=[3, 3], strides=[2, 2], activation='relu',
                                   padding='same', kernel_regularizer=L1L2(l1=0.003, l2=0.003))
-        self.x4 = Conv2DTranspose(filters=64, kernel_size=[1, 3], strides=[1, 3], activation='relu',
+        self.x4 = Conv2DTranspose(filters=64, kernel_size=[3, 3], strides=[2, 2], activation='relu',
                                   padding='same', kernel_regularizer=L1L2(l1=0.003, l2=0.003))
         self.x5_1 = Conv2DTranspose(filters=32, kernel_size=[3, 3], strides=[2, 2], activation='relu',
-                                  padding='same', kernel_regularizer=L1L2(l1=0.003, l2=0.003))
+                                    padding='same', kernel_regularizer=L1L2(l1=0.003, l2=0.003))
         self.x5_2 = Conv2D(filters=32, kernel_size=[1, 1], strides=[1, 1], activation='relu',
                            padding='same', kernel_regularizer=L1L2(l1=0.003, l2=0.003))
+
+        self.x6 = Conv2DTranspose(filters=16, kernel_size=[3, 3], strides=[2, 2], activation='relu',
+                                  padding='same', kernel_regularizer=L1L2(l1=0.003, l2=0.003))
 
         self.logit_fit = Conv2D(filters=1, kernel_size=[1, 1], strides=[1, 1], activation='sigmoid', padding='same',
                                 kernel_regularizer=L1L2(l1=0.003, l2=0.003))
@@ -49,7 +52,8 @@ class Decoder(Layer):
         x4 = self.x4(x3)
         x5 = self.x5_1(x4)
         x5 += self.x5_2(x5)
+        x6 = self.x6(x5)
 
-        logits = self.logit_fit(x5)
+        logits = self.logit_fit(x6)
 
         return logits
