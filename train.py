@@ -69,6 +69,7 @@ class Train(object):
     def decay(self):
         if self.not_learning_cnt > 3:
             self.lr *= 0.7
+            self.not_learning_cnt = 0
 
     @tf.function
     def compute_loss(self, train_data, outputs, binary_note, z_mean, z_var, td_binary):
@@ -126,12 +127,12 @@ class Train(object):
             train_loss = 0.
             train_time = time.time()
             random.shuffle(train_list)
-            for file in train_list[:int(len(train_list) * 0.7)]:
+            for file in train_list[:int(len(train_list) * 0.6)]:
                 dataset = set_data(file, BATCH_SIZE)
                 train_loss += batch(dataset)
             train_time = time.time() - train_time
             with self.summary_writer.as_default():
-                tf.summary.scalar('train_loss', train_loss / int(len(train_list) * 0.7), step=epoch)
+                tf.summary.scalar('train_loss', train_loss / int(len(train_list) * 0.6), step=epoch)
 
             # ---------------- test step ----------------
             test_loss = 0.
@@ -165,10 +166,13 @@ class Train(object):
                                                                                            train_time))
 
             if test_loss < self.best_loss:
+                self.not_learning_cnt = 0
                 self.best_loss = test_loss
                 if epoch > 10:
                     save_path = self.manager.save()
                     print("Saved checkpoint for epoch {}: {}".format(epoch, save_path))
+            else:
+                self.not_learning_cnt += 1
 
         return True
 
