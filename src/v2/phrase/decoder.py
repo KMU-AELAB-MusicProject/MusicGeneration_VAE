@@ -36,7 +36,7 @@ class Decoder(Layer):
 
         self.gru_fit = Conv2DTranspose(filters=1, kernel_size=[3, 3], strides=[2, 1], activation='relu',
                                        padding='same', kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
-        self.gru = GRU(units=96, return_sequences=False, recurrent_initializer='glorot_uniform',
+        self.gru = GRU(units=96, return_sequences=True, recurrent_initializer='glorot_uniform',
                        kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
 
         self.logit_fit = Conv2D(filters=1, kernel_size=[1, 1], strides=[1, 1], activation='sigmoid', padding='same',
