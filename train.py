@@ -54,10 +54,10 @@ class Train(object):
         self.best_loss = 99999999
         self.not_learning_cnt = 0
 
-        self.lr = 1e-3
+        self.lr = 0.00008
 
         self.mse_loss_fn = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM)
-        self.optimizer = tf.keras.optimizers.Adam(1e-3)
+        self.optimizer = tf.keras.optimizers.Adam(0.00008)
 
         self.ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=model)
         self.manager = tf.train.CheckpointManager(self.ckpt, save_path, max_to_keep=50)
@@ -67,7 +67,7 @@ class Train(object):
         self.model = model
 
     def decay(self):
-        if self.not_learning_cnt > 3:
+        if self.not_learning_cnt > 2:
             self.lr *= 0.7
             self.not_learning_cnt = 0
 
@@ -162,7 +162,7 @@ class Train(object):
                 tf.summary.image('output', np.array(outputs).reshape([-1, 384, 96, 1]), step=epoch)
 
             # --------------------------------------------
-            print("{} Epoch's loss: [train_loss: {:.5f} | test_loss: {:.5f}] ---- time: {:.5f} | lr: {:.8f}".
+            print("{} Epoch's loss: [train_loss: {:.7f} | test_loss: {:.7f}] ---- time: {:.5f} | lr: {:.8f}".
                   format(epoch, train_loss, test_loss, train_time, self.lr))
 
             if test_loss < self.best_loss:

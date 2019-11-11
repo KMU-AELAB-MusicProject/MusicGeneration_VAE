@@ -31,6 +31,13 @@ class Decoder(Layer):
 
         self.x6 = Conv2DTranspose(filters=16, kernel_size=[3, 3], strides=[2, 2], activation='relu',
                                   padding='same', kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+        self.x6_fit = Conv2D(filters=1, kernel_size=[1, 1], strides=[1, 1], activation='relu', padding='same',
+                             kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+
+        self.gru_fit = Conv2DTranspose(filters=1, kernel_size=[3, 3], strides=[2, 1], activation='relu',
+                                       padding='same', kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+        self.gru = GRU(units=96, return_sequences=False, recurrent_initializer='glorot_uniform',
+                       kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
 
         self.logit_fit = Conv2D(filters=1, kernel_size=[1, 1], strides=[1, 1], activation='sigmoid', padding='same',
                                 kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
@@ -52,8 +59,17 @@ class Decoder(Layer):
         x4 = self.x4(x3)
         x5 = self.x5_1(x4)
         x5 += self.x5_2(x5)
-        x6 = self.x6(x5)
 
-        logits = self.logit_fit(x6)
+        xr = self.gru_fit(x5)
+        xr = Reshape(target_shape=[384, 48])(xr)
+        xr = self.gru(xr)
+        xr = Reshape(target_shape=[384, 96, 1])(xr)
+
+        x6 = self.x6(x5)
+        x6 = self.x6_fit(x6)
+
+        x7 = concatenate([xr, x6], axis=-1)
+
+        logits = self.logit_fit(x7)
 
         return logits
