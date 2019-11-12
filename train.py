@@ -118,6 +118,7 @@ class Train(object):
             train_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(75)]
             test_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(75, 77)]
 
+        past = 999999999.
         print('################### start train ###################')
         for epoch in range(1, self.epochs + 1):
             self.decay()
@@ -146,12 +147,12 @@ class Train(object):
             dataset = set_data_test(train_list[0], BATCH_SIZE)
             output = test(dataset)
             with self.summary_writer.as_default():
-                tf.summary.image('train_output', output, step=epoch)
+                tf.summary.image('train_output', output*255, step=epoch)
 
             dataset = set_data(test_list[0], BATCH_SIZE)
             output = test(dataset)
             with self.summary_writer.as_default():
-                tf.summary.image('test_output', output, step=epoch)
+                tf.summary.image('test_output', output*255, step=epoch)
 
             outputs = []
             pre_phrase = np.zeros([1, 384, 96], dtype=np.float64)
@@ -159,20 +160,23 @@ class Train(object):
                 pre_phrase = self.model.test(pre_phrase, np.array([[idx]], dtype=np.float64))
                 outputs.append(pre_phrase)
             with self.summary_writer.as_default():
-                tf.summary.image('output', np.array(outputs).reshape([-1, 384, 96, 1]), step=epoch)
+                tf.summary.image('output', np.array(outputs).reshape([-1, 384, 96, 1])*255, step=epoch)
 
             # --------------------------------------------
             print("{} Epoch's loss: [train_loss: {:.7f} | test_loss: {:.7f}] ---- time: {:.5f} | lr: {:.8f}".
                   format(epoch, train_loss, test_loss, train_time, self.lr))
 
             if test_loss < self.best_loss:
-                self.not_learning_cnt = 0
                 self.best_loss = test_loss
                 if epoch > 10:
                     save_path = self.manager.save()
                     print("Saved checkpoint for epoch {}: {}".format(epoch, save_path))
-            else:
+
+            if train_loss > past:
+                past = train_loss
                 self.not_learning_cnt += 1
+            else:
+                self.not_learning_cnt = 0
 
         return True
 
