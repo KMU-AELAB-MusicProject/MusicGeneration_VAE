@@ -56,7 +56,7 @@ class Train(object):
 
         self.lr = 0.00008
 
-        self.mse_loss_fn = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM)
+        self.velocity_loss = tf.keras.losses.MeanAbsoluteError(reduction=tf.keras.losses.Reduction.NONE)
         self.optimizer = tf.keras.optimizers.Adam(0.00008)
 
         self.ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=model)
@@ -67,14 +67,22 @@ class Train(object):
         self.model = model
 
     def decay(self):
-        if self.not_learning_cnt > 2:
-            self.lr *= 0.7
+        if self.not_learning_cnt > 4:
+            self.lr *= 0.6
             self.not_learning_cnt = 0
 
     @tf.function
+    def beat_loss(self, targets, outputs):
+        loss = targets - outputs
+        note_loss = tf.keras.layers.average(tf.keras.backend.clip(loss, 0., 1.))
+        rest_loss = tf.keras.layers.average(tf.keras.backend.clip(loss, -1., 0.))
+
+        return note_loss * 0.8 - rest_loss * 0.8
+
+    @tf.function
     def compute_loss(self, train_data, outputs, binary_note, z_mean, z_var, td_binary):
-        loss = self.mse_loss_fn(td_binary, binary_note) * 0.4
-        loss += self.mse_loss_fn(train_data, outputs) * 0.6
+        loss = self.beat_loss(td_binary, binary_note) * 0.8
+        loss += self.velocity_loss(train_data, outputs) * 0.8
         loss -= 0.5 * tf.reduce_mean(z_var - tf.square(z_mean) - tf.exp(z_var) + 1.)
 
         return loss
@@ -170,13 +178,11 @@ class Train(object):
                 self.best_loss = test_loss
                 if epoch > 10:
                     save_path = self.manager.save()
-                    print("Saved checkpoint for epoch {}: {}".format(epoch, save_path))
+                    print("Saved checkpoint for epoch {}: {} ---- loss: {}".format(epoch, save_path, self.beat_loss))
 
             if train_loss > past:
-                past = train_loss
                 self.not_learning_cnt += 1
-            else:
-                self.not_learning_cnt = 0
+            past = train_loss
 
         return True
 
