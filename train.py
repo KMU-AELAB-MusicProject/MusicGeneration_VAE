@@ -77,11 +77,11 @@ class Train(object):
         note_loss = tf.keras.backend.sum(tf.keras.backend.clip(loss, 0., 1.))
         rest_loss = tf.keras.backend.sum(tf.keras.backend.clip(loss, -1., 0.))
 
-        return note_loss * 1.5 - rest_loss
+        return note_loss * 2 - rest_loss * 1.2
 
     @tf.function
     def compute_loss(self, train_data, outputs, binary_note, z_mean, z_var, td_binary):
-        loss = self.beat_loss(td_binary, binary_note)
+        loss = self.beat_loss(td_binary, binary_note) * 2
         loss += self.distribution_loss(train_data, outputs)
         loss -= 0.5 * tf.reduce_mean(z_var - tf.square(z_mean) - tf.exp(z_var) + 1.)
 
