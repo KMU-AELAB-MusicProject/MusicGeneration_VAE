@@ -53,6 +53,7 @@ class Train(object):
 
         self.best_loss = 99999999
         self.not_learning_cnt = 0
+        self.not_learning_limit = 4
 
         self.lr = 0.00008
 
@@ -67,9 +68,10 @@ class Train(object):
         self.model = model
 
     def decay(self):
-        if self.not_learning_cnt > 4:
+        if self.not_learning_cnt > self.not_learning_limit:
             self.lr *= 0.6
             self.not_learning_cnt = 0
+            self.not_learning_limit += 2
 
     @tf.function
     def beat_loss(self, targets, outputs):
@@ -178,7 +180,7 @@ class Train(object):
                 self.best_loss = test_loss
                 if epoch > 10:
                     save_path = self.manager.save()
-                    print("Saved checkpoint for epoch {}: {} ---- loss: {}".format(epoch, save_path, self.beat_loss))
+                    print("Saved checkpoint for epoch {}: {} ---- loss: {}".format(epoch, save_path, self.best_loss))
 
             if train_loss > past:
                 self.not_learning_cnt += 1
