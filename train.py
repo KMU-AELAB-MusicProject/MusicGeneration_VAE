@@ -57,7 +57,8 @@ class Train(object):
 
         self.lr = 0.00008
 
-        self.distribution_loss = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM)
+        self.velocity_loss = tf.keras.losses.MeanAbsolutePercentageError(reduction=tf.keras.losses.Reduction.SUM)
+        self.beat_loss = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM)
         self.optimizer = tf.keras.optimizers.Adam(0.00008)
 
         self.ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=model)
@@ -74,17 +75,17 @@ class Train(object):
             self.not_learning_limit += 2
 
     @tf.function
-    def beat_loss(self, targets, outputs):
+    def additional_loss(self, targets, outputs):
         loss = targets - outputs
         note_loss = tf.keras.backend.sum(tf.keras.backend.clip(loss, 0., 1.))
-        rest_loss = tf.keras.backend.sum(tf.keras.backend.clip(loss, -1., 0.))
 
-        return note_loss * 2 - rest_loss * 1.2
+        return note_loss * 10
 
     @tf.function
     def compute_loss(self, train_data, outputs, binary_note, z_mean, z_var, td_binary):
-        loss = self.beat_loss(td_binary, binary_note) * 2
-        loss += self.distribution_loss(train_data, outputs)
+        loss = self.beat_loss(td_binary, binary_note)
+        loss += self.velocity_loss(train_data, outputs)
+        loss += self.additional_loss(td_binary, binary_note)
         loss -= 0.5 * tf.reduce_mean(z_var - tf.square(z_mean) - tf.exp(z_var) + 1.)
 
         return loss
