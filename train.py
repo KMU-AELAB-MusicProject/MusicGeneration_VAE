@@ -57,7 +57,7 @@ class Train(object):
 
         self.lr = 0.00008
 
-        self.velocity_loss = tf.keras.losses.MeanAbsolutePercentageError(reduction=tf.keras.losses.Reduction.SUM)
+        self.velocity_loss = tf.keras.losses.MeanAbsoluteError(reduction=tf.keras.losses.Reduction.SUM)
         self.beat_loss = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM)
         self.optimizer = tf.keras.optimizers.Adam(0.00008)
 
@@ -79,13 +79,13 @@ class Train(object):
         loss = targets - outputs
         note_loss = tf.keras.backend.sum(tf.keras.backend.clip(loss, 0., 1.))
 
-        return note_loss * 10
+        return note_loss
 
     @tf.function
     def compute_loss(self, train_data, outputs, binary_note, z_mean, z_var, td_binary):
         loss = self.beat_loss(td_binary, binary_note)
         loss += self.velocity_loss(train_data, outputs)
-        loss += self.additional_loss(td_binary, binary_note)
+        loss += self.additional_loss(td_binary, binary_note) * 0.5
         loss -= 0.5 * tf.reduce_mean(z_var - tf.square(z_mean) - tf.exp(z_var) + 1.)
 
         return loss

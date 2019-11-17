@@ -11,38 +11,38 @@ class Encoder(Layer):
         super(Encoder, self).__init__(name='phrase_encoder')
 
         self.x1_1_1 = Conv2D(filters=32, kernel_size=[1, 4], strides=[1, 2], activation='relu', padding='same',
-                             kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+                             kernel_regularizer=L1L2(l1=0.0001, l2=0.001))
         self.x1_1_2 = Conv2D(filters=32, kernel_size=[4, 1], strides=[2, 1], activation='relu', padding='same',
-                             kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+                             kernel_regularizer=L1L2(l1=0.0001, l2=0.001))
 
         self.x1_2_1 = Conv2D(filters=32, kernel_size=[4, 1], strides=[2, 1], activation='relu', padding='same',
-                             kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+                             kernel_regularizer=L1L2(l1=0.0001, l2=0.001))
         self.x1_2_2 = Conv2D(filters=32, kernel_size=[1, 4], strides=[1, 2], activation='relu', padding='same',
-                               kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+                               kernel_regularizer=L1L2(l1=0.0001, l2=0.001))
 
         self.x2 = Conv2D(filters=64, kernel_size=[3, 3], strides=[2, 2], activation='relu', padding='same',
-                             kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+                             kernel_regularizer=L1L2(l1=0.0001, l2=0.001))
         self.x2_fit = Conv2D(filters=64, kernel_size=[1, 1], strides=[1, 1], activation='relu', padding='same',
-                         kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+                         kernel_regularizer=L1L2(l1=0.0001, l2=0.001))
 
         self.x3 = Conv2D(filters=128, kernel_size=[3, 3], strides=[2, 2], activation='relu', padding='same',
-                         kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+                         kernel_regularizer=L1L2(l1=0.0001, l2=0.001))
         self.x4 = Conv2D(filters=256, kernel_size=[3, 3], strides=[2, 2], activation='relu', padding='same',
-                           kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+                           kernel_regularizer=L1L2(l1=0.0001, l2=0.001))
         self.x4_fit = Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], activation='relu', padding='same',
-                         kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+                         kernel_regularizer=L1L2(l1=0.0001, l2=0.001))
 
         self.x5 = Conv2D(filters=510, kernel_size=[3, 3], strides=[2, 2], activation='relu', padding='same',
-                         kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+                         kernel_regularizer=L1L2(l1=0.0001, l2=0.001))
 
         self.avg = AveragePooling2D([12, 3])
 
         self.flatten = tf.keras.layers.Flatten()
 
         self.gru_fit = Conv2D(filters=1, kernel_size=[1, 1], strides=[1, 1], activation='relu', padding='same',
-                              kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+                              kernel_regularizer=L1L2(l1=0.0001, l2=0.001))
         self.gru = GRU(units=510, return_sequences=False, recurrent_initializer='glorot_uniform',
-                       kernel_regularizer=L1L2(l1=0.0005, l2=0.001))
+                       kernel_regularizer=L1L2(l1=0.0001, l2=0.001))
 
         self.mean = Dense(510)
         self.var = Dense(510)
