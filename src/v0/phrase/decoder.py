@@ -14,7 +14,7 @@ class Decoder(Layer):
 
         self.x2 = Conv2D(filters=256, kernel_size=[1, 1], strides=[1, 1], activation='relu', padding='same')
 
-        self.x3 = Conv2DTranspose(filters=128, kernel_size=[3, 3], strides=[2, 2], activation='relu')
+        self.x3 = Conv2DTranspose(filters=128, kernel_size=[3, 3], strides=[2, 2], activation='relu', padding='same')
         self.x4 = Conv2DTranspose(filters=64, kernel_size=[3, 3], strides=[2, 2], activation='relu', padding='same')
         self.x5_1 = Conv2DTranspose(filters=32, kernel_size=[3, 3], strides=[2, 2], activation='relu', padding='same')
         self.x5_2 = Conv2D(filters=32, kernel_size=[1, 1], strides=[1, 1], activation='relu', padding='same')
