@@ -6,8 +6,8 @@ import argparse
 import numpy as np
 import tensorflow as tf
 
-from src.v1.phrase.model import PhraseModel
-from src.v1.bar.model import BarModel
+from src.v1_old.phrase.model import PhraseModel
+from src.v1_old.bar.model import BarModel
 from config import *
 
 parser = argparse.ArgumentParser()

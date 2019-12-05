@@ -29,7 +29,8 @@ class Encoder(Layer):
 
         self.flatten = tf.keras.layers.Flatten()
 
-        self.dense = Dense(510)
+        self.mean = Dense(510)
+        self.var = Dense(510)
 
     def call(self, input):
         x = Reshape(target_shape=[384, 96, 1])(input)
@@ -60,6 +61,8 @@ class Encoder(Layer):
             x5 = self.flatten(x5)
 
 
-        z = self.dense(x5)
+        z_mean = self.mean(x5)
+        z_var = self.var(x5)
 
-        return z
+        eps = tf.random.normal(shape=tf.shape(z_mean), dtype=tf.float64)
+        return (eps * tf.exp(z_var * .5) + z_mean), z_mean, z_var   # z, z-mean, z-var

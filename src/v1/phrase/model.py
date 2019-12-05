@@ -16,35 +16,44 @@ class PhraseModel(tf.keras.Model):
         self.encoder = Encoder()
         self.decoder = Decoder()
 
-        self.phrase_number = Embedding(332, 510, dtype=tf.float64)
+        self.phrase_number = Embedding(332, 510, dtype=tf.float64, name='phrase_number')
+        self.quantisation = Embedding(128, 510, dtype=tf.float64, name='quantisation')
+
+    def vq(self, z):
+        with tf.variable_scope("vq"):
+            z = tf.expand_dims(z, -2)  # (B, t, 1, D)
+            lookup_table_ = tf.reshape(self.quantisation, [1, 1, 128, 510])  # (1, 1, K, D)
+            dist = tf.norm(z - lookup_table_, axis=-1)  # Broadcasting -> (B, T', K)
+            k = tf.argmin(dist, axis=-1)  # (B, t)
+
+            return tf.gather(self.quantisation, k)  # (B, t, D)
 
     def call(self, train_data, pre_phrase, position_number):
         z, z_mean, z_var = self.encoder(train_data)  # train-phrase
         z_pre, _, _ = self.encoder(pre_phrase)  # pre-phrase
 
-        logits = self.decoder(z + z_pre + Reshape(target_shape=[510])(self.phrase_number(position_number)))
+        z_q = self.vq(z)
+        z_pre_q = self.vq(z_pre)
 
-        reshape_logits = Reshape(target_shape=[384, 96])(logits)
-        binary_note = tf.cast(tf.keras.backend.greater(reshape_logits, 0.35), dtype=tf.float64)
-        outputs = multiply([binary_note, reshape_logits], dtype=tf.float64)
+        logits = self.decoder(z_q + z_pre_q + Reshape(target_shape=[510])(self.phrase_number(position_number)))
 
-        return Reshape(target_shape=[384, 96, 1])(outputs), binary_note, z, z_mean, z_var, \
-               tf.cast(tf.keras.backend.greater(train_data, 0.35), dtype=tf.float64)
+        outputs = tf.keras.activations.sigmoid(logits)
+
+        return outputs, z, z_q
 
     def get_feature(self, input):
         z, _, _ = self.encoder(input)
         return z
 
     def test(self, pre_phrase, position_number):
-        z, _, _ = self.encoder(pre_phrase)
-        logits = self.decoder(z + tf.random.normal(shape=(1, 510), dtype=tf.float64) +
-                              Reshape(target_shape=[510])(self.phrase_number(position_number)))
+        z_pre, _, _ = self.encoder(pre_phrase)
+        z_pre_q = self.vq(z_pre)
+        z_q = self.vq(tf.random.normal(shape=(1, 510), dtype=tf.float64))
+        logits = self.decoder(z_q + z_pre_q + Reshape(target_shape=[510])(self.phrase_number(position_number)))
 
-        reshape_logits = Reshape(target_shape=[384, 96])(logits)
-        binary_note = tf.cast(tf.keras.backend.greater(reshape_logits, 0.35), dtype=tf.float64)
-        outputs = multiply([binary_note, reshape_logits], dtype=tf.float64)
+        outputs = tf.keras.activations.sigmoid(logits)
 
-        return Reshape(target_shape=[384, 96, 1])(outputs)
+        return outputs
 
 
 if __name__ == '__main__':
