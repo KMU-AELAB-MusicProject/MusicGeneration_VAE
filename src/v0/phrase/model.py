@@ -8,6 +8,7 @@ from tensorflow.keras.layers import Reshape, multiply, Embedding
 # from config import *
 from .encoder import Encoder
 from .decoder import Decoder
+from ..phrase_discriminator import PhraseDiscriminatorModel
 
 
 class PhraseModel(tf.keras.Model):
@@ -15,6 +16,7 @@ class PhraseModel(tf.keras.Model):
         super(PhraseModel, self).__init__(name='phrase_model')
         self.encoder = Encoder()
         self.decoder = Decoder()
+        self.discriminator = PhraseDiscriminatorModel()
 
         self.phrase_number = Embedding(332, 510, dtype=tf.float64, name='phrase_number')
         self.quantisation = Embedding(128, 510, dtype=tf.float64, name='quantisation')
@@ -39,7 +41,10 @@ class PhraseModel(tf.keras.Model):
 
         outputs = tf.keras.activations.sigmoid(logits)
 
-        return outputs, z, z_q
+        df_logits = self.discriminator(outputs)
+        dr_logits = self.discriminator(train_data)
+
+        return outputs, z, z_q, df_logits, dr_logits
 
     def get_feature(self, input):
         z, _, _ = self.encoder(input)

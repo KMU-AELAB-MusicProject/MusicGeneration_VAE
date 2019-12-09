@@ -49,7 +49,7 @@ def set_data_test(file, batch_size):
 
 
 class Train(object):
-    def __init__(self, model, model_d, save_path, save_path_d, board_path):
+    def __init__(self, model, save_path, save_path_d, board_path):
         self.epochs = TRAIN_EPOCH
 
         self.train_best_loss = 99999999
@@ -83,7 +83,6 @@ class Train(object):
         self.summary_writer = tf.summary.create_file_writer(board_path)
 
         self.model = model
-        self.model_d = model_d
 
     def decay(self):
         if self.not_learning_cnt > self.not_learning_limit:
@@ -119,10 +118,7 @@ class Train(object):
                 with tf.device('/device:GPU:0'):
                     with tf.GradientTape() as tape:
                         train_data, pre_phrase, position_number = one_batch
-                        outputs, z, z_q = self.model(train_data, pre_phrase, position_number)
-
-                        df_logit = self.model_d(outputs)
-                        dr_logit = self.model_d(train_data)
+                        outputs, z, z_q, df_logit, dr_logit = self.model(train_data, pre_phrase, position_number)
 
                         d_loss = tf.reduce_mean(self.bc_loss(train_data, outputs) +
                                                 self.additional_loss(train_data, outputs) * 0.5)
@@ -254,17 +250,15 @@ if __name__ == '__main__':
     if args.train_phrase:
         import_model = importlib.import_module('src.v{}.phrase.model'.format(args.model_number))
         model = import_model.PhraseModel()
-        model_d = importlib.import_module('src.phrase_discriminator').PhraseDiscriminatorModel()
         save_path = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number), 'phrase')
         save_path_d = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'phrase_discriminator')
         board_path = os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'phrase')
     else:
         import_model = importlib.import_module('src.v{}.bar.model'.format(args.model_number))
-        model = import_model.BareModel()
-        model_d = None #importlib.import_module('src.phrase_discriminator').PhraseDiscriminatorModel()
+        model = import_model.BarModel()
         save_path_d = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'bar_discriminator')
         save_path = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number), 'bar')
         board_path = os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'bar')
 
-    trainer = Train(model, model_d, save_path, save_path_d, board_path)
+    trainer = Train(model, save_path, save_path_d, board_path)
     trainer.train()
