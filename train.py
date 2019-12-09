@@ -118,31 +118,7 @@ class Train(object):
         return loss
 
     def train(self):
-        def first_state(ds, isTrain=True):
-            loss = np.float64(0.0)
-
-            for one_batch in ds:
-                with tf.device('/device:GPU:0'):
-                    with tf.GradientTape() as tape:
-                        train_data, pre_phrase, position_number = one_batch
-                        outputs, z, z_q = self.model(train_data, pre_phrase, position_number)
-                        d_loss, q_loss, e_loss = self.vq_loss(outputs, z, z_q, train_data)
-
-                    if isTrain:
-                        d_gradients = tape.gradient(d_loss, self.model.trainable_variables)
-                        q_gradients = tape.gradient(q_loss, self.model.trainable_variables)
-                        e_gradients = tape.gradient(e_loss, self.model.trainable_variables)
-
-                        d_vars = list(zip(d_gradients, self.model.trainable_variables))
-                        q_vars = list(zip(q_gradients, self.model.trainable_variables))
-                        e_vars = list(zip(e_gradients, self.model.trainable_variables))
-
-                        self.optimizer.apply_gradients(d_vars + q_vars + e_vars)
-
-                        loss += d_loss + q_loss + e_loss
-            return loss
-
-        def second_state(ds, isTrain=True):
+        def batch(ds, isSecond=True, isTrain=True):
             loss = np.float64(0.0)
             dis_loss = np.float64(0.0)
 
@@ -151,43 +127,45 @@ class Train(object):
                     with tf.GradientTape() as tape:
                         train_data, pre_phrase, position_number = one_batch
                         outputs, z, z_q = self.model(train_data, pre_phrase, position_number)
-                        d_loss, q_loss, e_loss = self.vq_loss(outputs, z, z_q, train_data)
 
+                        d_loss, q_loss, e_loss = self.vq_loss(outputs, z, z_q, train_data)
                         g_loss = self.gan_loss()
 
-                    if isTrain:
-                        d_gradients = tape.gradient(d_loss + g_loss, self.model.trainable_variables)
-                        q_gradients = tape.gradient(q_loss + g_loss, self.model.trainable_variables)
-                        e_gradients = tape.gradient(e_loss + g_loss, self.model.trainable_variables)
-
-                        d_vars = list(zip(d_gradients, self.model.trainable_variables))
-                        q_vars = list(zip(q_gradients, self.model.trainable_variables))
-                        e_vars = list(zip(e_gradients, self.model.trainable_variables))
-
-                        self.optimizer.apply_gradients(d_vars + q_vars + e_vars)
-
-                    loss += d_loss + q_loss + e_loss + g_loss
-
-            return loss, dis_loss
-
-        def d_state(ds):
-            loss = np.float64(0.0)
-
-            for one_batch in ds:
-                with tf.device('/device:GPU:0'):
-                    with tf.GradientTape() as tape:
-                        train_data, pre_phrase, position_number = one_batch
-                        outputs = self.model.test(pre_phrase, position_number)
                         l = self.discriminator_loss(outputs, train_data)
 
+                    if isTrain:
                         gradients = tape.gradient(l, self.model.trainable_variables)
                         vars = list(zip(gradients, self.model.trainable_variables))
 
-                        self.d_optimizer.apply_gradients(vars)
+                        self.optimizer_d.apply_gradients(vars)
+                        dis_loss += l
 
-                    loss += l
+                        if isSecond:
+                            d_gradients = tape.gradient(d_loss + g_loss, self.model.trainable_variables)
+                            q_gradients = tape.gradient(q_loss + g_loss * 0.2, self.model.trainable_variables)
+                            e_gradients = tape.gradient(e_loss + g_loss * 0.2, self.model.trainable_variables)
 
-            return loss
+                            d_vars = list(zip(d_gradients, self.model.trainable_variables))
+                            q_vars = list(zip(q_gradients, self.model.trainable_variables))
+                            e_vars = list(zip(e_gradients, self.model.trainable_variables))
+
+                            self.optimizer.apply_gradients(d_vars + q_vars + e_vars)
+
+                            loss += d_loss + q_loss + e_loss + g_loss
+                        else:
+                            d_gradients = tape.gradient(d_loss, self.model.trainable_variables)
+                            q_gradients = tape.gradient(q_loss, self.model.trainable_variables)
+                            e_gradients = tape.gradient(e_loss, self.model.trainable_variables)
+
+                            d_vars = list(zip(d_gradients, self.model.trainable_variables))
+                            q_vars = list(zip(q_gradients, self.model.trainable_variables))
+                            e_vars = list(zip(e_gradients, self.model.trainable_variables))
+
+                            self.optimizer.apply_gradients(d_vars + q_vars + e_vars)
+
+                            loss += d_loss + q_loss + e_loss
+
+            return loss, dis_loss
 
         def test(ds):
             output = np.zeros([10, 10, 3])
@@ -200,9 +178,7 @@ class Train(object):
                         output = outputs
             return output
 
-        first_state = tf.function(first_state)
-        second_state = tf.function(second_state)
-        d_state = tf.function(d_state)
+        batch = tf.function(batch)
         test = tf.function(test)
 
         if args.train_phrase:
@@ -219,29 +195,28 @@ class Train(object):
             self.decay()
             self.optimizer.learning_rate = self.lr
 
-            if self.state_num is 1:
-                batch = first_state
-            elif self.state_num is 2:
-                batch = second_state()
-            else:
-                batch = d_state()
-
             # ---------------- train step ----------------
             train_loss = 0.
+            train_loss_d = 0.
             train_time = time.time()
             random.shuffle(train_list)
             for file in train_list[:int(len(train_list) * 0.6)]:
                 dataset = set_data(file, BATCH_SIZE)
-                train_loss += batch(dataset)
+                t_loss, d_loss = batch(dataset)
+                train_loss += t_loss
+                train_loss_d += d_loss
             train_time = time.time() - train_time
             with self.summary_writer.as_default():
                 tf.summary.scalar('train_loss', train_loss / int(len(train_list) * 0.6), step=epoch)
 
             # ---------------- test step ----------------
             test_loss = 0.
+            test_loss_d = 0.
             for file in test_list:
                 dataset = set_data_test(file, BATCH_SIZE)
-                test_loss += batch(dataset, False)
+                t_loss, d_loss = batch(dataset, False)
+                test_loss += t_loss
+                test_loss_d += d_loss
             with self.summary_writer.as_default():
                 tf.summary.scalar('test_loss', test_loss / len(test_list), step=epoch)
 
