@@ -22,7 +22,7 @@ class PhraseModel(tf.keras.Model):
         self.quantisation = Embedding(128, 510, dtype=tf.float64, name='quantisation')
 
     def vq(self, z):
-        with tf.variable_scope("vq"):
+        with tf.name_scope("vq"):
             z = tf.expand_dims(z, -2)  # (B, t, 1, D)
             lookup_table_ = tf.reshape(self.quantisation, [1, 1, 128, 510])  # (1, 1, K, D)
             dist = tf.norm(z - lookup_table_, axis=-1)  # Broadcasting -> (B, T', K)

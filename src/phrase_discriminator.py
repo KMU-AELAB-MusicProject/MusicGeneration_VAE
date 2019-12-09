@@ -83,7 +83,7 @@ class PhraseDiscriminatorModel(tf.keras.Model):
         feature = concatenate([x4, chord_x4, on_off_x4], axis=-1)  # 1, 1, 128 * 3
 
         feature1 = self.feature1(feature)   # 1, 1, 128
-        feature2 = self.feature1(feature1)  # 1, 1, 2
+        feature2 = self.feature1(feature1)  # 1, 1, 1
 
         logits = self.flatten(feature2)
 
