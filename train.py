@@ -109,7 +109,6 @@ class Train(object):
         return loss
 
     def train(self):
-        @tf.function
         def batch(ds, isTrain=True):
             loss = np.float64(0.0)
             dis_loss = np.float64(0.0)
