@@ -98,18 +98,10 @@ class Train(object):
         return tf.keras.backend.sum(tf.keras.backend.clip(loss, 0., 1.))
 
     @tf.function
-    def vq_loss(self, outputs, z, z_q, train_data):
-        d_loss = tf.reduce_mean(self.bc_loss(train_data, outputs) + self.additional_loss(train_data, outputs) * 0.5)
-        q_loss = tf.reduce_mean(self.mse_loss(tf.stop_gradient(z), z_q))
-        e_loss = tf.reduce_mean(self.mse_loss(tf.stop_gradient(z_q), z) * 0.22)
-
-        return d_loss, q_loss, e_loss
-
-    @tf.function
     def gan_loss(self, logits):
         loss = self.bc_loss(tf.ones_like(logits), logits)
 
-        return -loss
+        return loss
 
     @tf.function
     def discriminator_loss(self, f_logits, r_logits):
@@ -132,7 +124,10 @@ class Train(object):
                         df_logit = self.model_d(outputs)
                         dr_logit = self.model_d(train_data)
 
-                        d_loss, q_loss, e_loss = self.vq_loss(outputs, z, z_q, train_data)
+                        d_loss = tf.reduce_mean(self.bc_loss(train_data, outputs) +
+                                                self.additional_loss(train_data, outputs) * 0.5)
+                        q_loss = tf.reduce_mean(self.mse_loss(tf.stop_gradient(z), z_q))
+                        e_loss = tf.reduce_mean(self.mse_loss(tf.stop_gradient(z_q), z) * 0.22)
                         g_loss = self.gan_loss(df_logit)
 
                         l = self.discriminator_loss(df_logit, dr_logit)
