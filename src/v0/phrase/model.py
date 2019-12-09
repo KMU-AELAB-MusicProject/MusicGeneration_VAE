@@ -8,7 +8,7 @@ from tensorflow.keras.layers import Reshape, multiply, Embedding
 # from config import *
 from .encoder import Encoder
 from .decoder import Decoder
-from ..phrase_discriminator import PhraseDiscriminatorModel
+from ...phrase_discriminator import PhraseDiscriminatorModel
 
 
 class PhraseModel(tf.keras.Model):

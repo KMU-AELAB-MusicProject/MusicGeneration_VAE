@@ -129,7 +129,7 @@ class Train(object):
                         l = self.discriminator_loss(df_logit, dr_logit)
 
                     if isTrain:
-                        gradients = tape.gradient(l, self.model.trainable_variables)
+                        gradients = tape.gradient(l, self.model.discriminator.trainable_variables)
                         vars = list(zip(gradients, self.model.trainable_variables))
 
                         self.optimizer_d.apply_gradients(vars)
@@ -149,16 +149,13 @@ class Train(object):
 
             return loss, dis_loss
 
-        @tf.function
         def test(ds):
             output = np.zeros([10, 10, 3])
             for one_batch in ds:
                 with tf.device('/device:GPU:0'):
-                    with tf.GradientTape() as tape:
-                        train_data, pre_phrase, position_number = one_batch
-                        outputs, binary_note, z, z_mean, z_var, td_binary = self.model(train_data, pre_phrase,
-                                                                                       position_number)
-                        output = outputs
+                    train_data, pre_phrase, position_number = one_batch
+                    outputs, z, z_q, df_logit, dr_logit = self.model(train_data, pre_phrase, position_number)
+                    output = outputs
             return output
 
         if args.train_phrase:
@@ -167,6 +164,9 @@ class Train(object):
         else:
             train_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(75)]
             test_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(75, 77)]
+
+        batch = tf.function(batch)
+        test = tf.function(test)
 
         past = 999999999.
         past_d = 999999999.
