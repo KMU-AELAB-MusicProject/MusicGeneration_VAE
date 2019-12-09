@@ -118,7 +118,7 @@ class Train(object):
         return loss
 
     def train(self):
-        def batch(ds, isSecond=True, isTrain=True):
+        def batch(ds, isTrain=True):
             loss = np.float64(0.0)
             dis_loss = np.float64(0.0)
 
@@ -140,30 +140,17 @@ class Train(object):
                         self.optimizer_d.apply_gradients(vars)
                         dis_loss += l
 
-                        if isSecond:
-                            d_gradients = tape.gradient(d_loss + g_loss, self.model.trainable_variables)
-                            q_gradients = tape.gradient(q_loss + g_loss * 0.2, self.model.trainable_variables)
-                            e_gradients = tape.gradient(e_loss + g_loss * 0.2, self.model.trainable_variables)
+                        d_gradients = tape.gradient(d_loss + g_loss, self.model.trainable_variables)
+                        q_gradients = tape.gradient(q_loss + g_loss * 0.2, self.model.trainable_variables)
+                        e_gradients = tape.gradient(e_loss + g_loss * 0.2, self.model.trainable_variables)
 
-                            d_vars = list(zip(d_gradients, self.model.trainable_variables))
-                            q_vars = list(zip(q_gradients, self.model.trainable_variables))
-                            e_vars = list(zip(e_gradients, self.model.trainable_variables))
+                        d_vars = list(zip(d_gradients, self.model.trainable_variables))
+                        q_vars = list(zip(q_gradients, self.model.trainable_variables))
+                        e_vars = list(zip(e_gradients, self.model.trainable_variables))
 
-                            self.optimizer.apply_gradients(d_vars + q_vars + e_vars)
+                        self.optimizer.apply_gradients(d_vars + q_vars + e_vars)
 
-                            loss += d_loss + q_loss + e_loss + g_loss
-                        else:
-                            d_gradients = tape.gradient(d_loss, self.model.trainable_variables)
-                            q_gradients = tape.gradient(q_loss, self.model.trainable_variables)
-                            e_gradients = tape.gradient(e_loss, self.model.trainable_variables)
-
-                            d_vars = list(zip(d_gradients, self.model.trainable_variables))
-                            q_vars = list(zip(q_gradients, self.model.trainable_variables))
-                            e_vars = list(zip(e_gradients, self.model.trainable_variables))
-
-                            self.optimizer.apply_gradients(d_vars + q_vars + e_vars)
-
-                            loss += d_loss + q_loss + e_loss
+                        loss += d_loss + q_loss + e_loss + g_loss
 
             return loss, dis_loss
 
