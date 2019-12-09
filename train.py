@@ -25,6 +25,7 @@ def set_dir():
         time.sleep(0.1)
         os.mkdir(os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'phrase'))
         os.mkdir(os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'bar'))
+
     if not os.path.exists(os.path.join(ROOT_PATH, MODEL_SAVE_PATH)):
         os.mkdir(os.path.join(ROOT_PATH, MODEL_SAVE_PATH))
         time.sleep(0.1)
@@ -294,14 +295,17 @@ if __name__ == '__main__':
     if args.train_phrase:
         import_model = importlib.import_module('src.v{}.phrase.model'.format(args.model_number))
         model = import_model.PhraseModel()
-        d_model = importlib.import_module('src.phrase_discriminator').PhraseDiscriminatorModel()
+        model_d = importlib.import_module('src.phrase_discriminator').PhraseDiscriminatorModel()
         save_path = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number), 'phrase')
+        save_path_d = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'phrase_discriminator')
         board_path = os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'phrase')
     else:
         import_model = importlib.import_module('src.v{}.bar.model'.format(args.model_number))
         model = import_model.BareModel()
+        model_d = None #importlib.import_module('src.phrase_discriminator').PhraseDiscriminatorModel()
+        save_path_d = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'bar_discriminator')
         save_path = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number), 'bar')
         board_path = os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'bar')
 
-    trainer = Train(model, d_model, save_path, board_path)
+    trainer = Train(model, model_d, save_path, save_path_d, board_path)
     trainer.train()

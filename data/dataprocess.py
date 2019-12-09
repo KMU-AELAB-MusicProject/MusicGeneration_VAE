@@ -67,7 +67,6 @@ def data_maker():
             data = np.append(data, np.take(note_data, [i for i in range(17, 113)], axis=-1), axis=0)
 
             # phrase/pre-phrase/phrase-number
-            print(np.array(phrase_data[0]).shape)
             phrase_data[0].extend(data[1:])
             phrase_data[1].extend(data[:-1])
             phrase_data[2].extend(number_data)
@@ -79,7 +78,6 @@ def data_maker():
                     bar_data[1].append(data[d-1])
                     bar_data[2].append(idx)
                     idx = (idx + 1) % 4
-            print(np.array(bar_data[0]).shape)
         while len(phrase_data[0]) > 6000:
             np.savez_compressed(os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(file_num1)),
                                 train_data=phrase_data[0][:6000], pre_phrase=phrase_data[1][:6000],
@@ -138,9 +136,10 @@ def converter(file):
         if padding_size:
             data = np.concatenate((data, np.array([[0 for _ in range(128)] for _ in range(padding_size)])), axis=0)
 
-        data.astype(np.float32)
+        data.astype(np.float64)
         data = data / 127.
         data[data < 0.35] = 0.
+        data[data >= 0.35] = 1.
 
         data_by_phrase = []
         phrase_number = [330] + [i for i in range(tmp - 2, -1, -1)]
@@ -157,36 +156,36 @@ def converter(file):
         return None
 
 def main():
-    # if not os.path.exists(os.path.join(DATA_PATH, 'np')):
-    #     os.mkdir(os.path.join(DATA_PATH, 'np'))
-    # if not os.path.exists(os.path.join(DATA_PATH, 'bar_data')):
-    #     os.mkdir(os.path.join(DATA_PATH, 'bar_data'))
-    # if not os.path.exists(os.path.join(DATA_PATH, 'phrase_data')):
-    #     os.mkdir(os.path.join(DATA_PATH, 'phrase_data'))
-    # if not os.path.exists(os.path.join(DATA_PATH, 'midi')):
-    #     gdd.download_file_from_google_drive(file_id='1L854vE7ghnI8uD-gR5McDZ71Wt-g9iH4',
-    #                                         dest_path=os.path.join(DATA_PATH, 'midi.zip'),
-    #                                         unzip=True)
-    #
-    # midi_info = {}
-    #
-    # warnings.filterwarnings('ignore')
-    #
-    # files = list(filter(lambda x: '.mid' in x, os.listdir(MIDI_FILE_PATH)))
-    #
-    # if multiprocessing.cpu_count() > 1:
-    #      kv_pairs = joblib.Parallel(n_jobs=multiprocessing.cpu_count() - 1, verbose=5)(joblib.delayed(converter)(file) for file in files)
-    #      for kv_pair in kv_pairs:
-    #         if kv_pair is not None:
-    #             midi_info[kv_pair[0]] = kv_pair[1]
-    # else:
-    #     for file in files:
-    #         kv_pair = converter(file)
-    #         if kv_pair is not None:
-    #             midi_info[kv_pair[0]] = kv_pair[1]
-    #
-    # with open(os.path.join(DATA_PATH, 'midi_info.pkl'), 'wb') as fp:
-    #     pickle.dump(midi_info, fp)
+    if not os.path.exists(os.path.join(DATA_PATH, 'np')):
+        os.mkdir(os.path.join(DATA_PATH, 'np'))
+    if not os.path.exists(os.path.join(DATA_PATH, 'bar_data')):
+        os.mkdir(os.path.join(DATA_PATH, 'bar_data'))
+    if not os.path.exists(os.path.join(DATA_PATH, 'phrase_data')):
+        os.mkdir(os.path.join(DATA_PATH, 'phrase_data'))
+    if not os.path.exists(os.path.join(DATA_PATH, 'midi')):
+        gdd.download_file_from_google_drive(file_id='1L854vE7ghnI8uD-gR5McDZ71Wt-g9iH4',
+                                            dest_path=os.path.join(DATA_PATH, 'midi.zip'),
+                                            unzip=True)
+
+    midi_info = {}
+
+    warnings.filterwarnings('ignore')
+
+    files = list(filter(lambda x: '.mid' in x, os.listdir(MIDI_FILE_PATH)))
+
+    if multiprocessing.cpu_count() > 1:
+         kv_pairs = joblib.Parallel(n_jobs=multiprocessing.cpu_count() - 1, verbose=5)(joblib.delayed(converter)(file) for file in files)
+         for kv_pair in kv_pairs:
+            if kv_pair is not None:
+                midi_info[kv_pair[0]] = kv_pair[1]
+    else:
+        for file in files:
+            kv_pair = converter(file)
+            if kv_pair is not None:
+                midi_info[kv_pair[0]] = kv_pair[1]
+
+    with open(os.path.join(DATA_PATH, 'midi_info.pkl'), 'wb') as fp:
+        pickle.dump(midi_info, fp)
 
     data_maker()
 
