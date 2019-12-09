@@ -106,14 +106,14 @@ class Train(object):
         return d_loss, q_loss, e_loss
 
     @tf.function
-    def gan_loss(self, outputs):
-        loss = tf.reduce_mean(self.model_d(outputs))
+    def gan_loss(self, logits):
+        loss = self.bc_loss(tf.ones_like(logits), logits)
 
         return -loss
 
     @tf.function
-    def discriminator_loss(self, outputs, train_data):
-        loss = tf.reduce_mean(self.model_d(outputs)) - tf.reduce_mean(self.model_d(train_data))
+    def discriminator_loss(self, f_logits, r_logits):
+        loss = self.bc_loss(tf.ones_like(r_logits), r_logits) + self.bc_loss(tf.zeros_like(f_logits), f_logits)
 
         return loss
 
@@ -129,10 +129,13 @@ class Train(object):
                         train_data, pre_phrase, position_number = one_batch
                         outputs, z, z_q = self.model(train_data, pre_phrase, position_number)
 
-                        d_loss, q_loss, e_loss = self.vq_loss(outputs, z, z_q, train_data)
-                        g_loss = self.gan_loss()
+                        df_logit = self.model_d(outputs)
+                        dr_logit = self.model_d(train_data)
 
-                        l = self.discriminator_loss(outputs, train_data)
+                        d_loss, q_loss, e_loss = self.vq_loss(outputs, z, z_q, train_data)
+                        g_loss = self.gan_loss(df_logit)
+
+                        l = self.discriminator_loss(df_logit, dr_logit)
 
                     if isTrain:
                         gradients = tape.gradient(l, self.model.trainable_variables)
