@@ -24,7 +24,6 @@ class PhraseModel(tf.keras.Model):
     def vq(self, z):
         with tf.name_scope("vq"):
             z = tf.expand_dims(z, -2)  # (B, t, 1, D)
-            print(self.quantisation(np.array([i for i in range(128)])))
             lookup_table = tf.reshape(self.quantisation(np.array([i for i in range(128)])), [128, 510])  # (1, 1, K, D)
             dist = tf.norm(z - lookup_table, axis=-1)  # Broadcasting -> (B, T', K)
             k = tf.argmin(dist, axis=-1)  # (B, t)
@@ -45,7 +44,7 @@ class PhraseModel(tf.keras.Model):
         df_logits = self.discriminator(outputs)
         dr_logits = self.discriminator(train_data)
 
-        return outputs, z, z_q, df_logits, dr_logits
+        return outputs, z, z_q, z_pre, z_pre_q, df_logits, dr_logits
 
     def get_feature(self, input):
         z, _, _ = self.encoder(input)
