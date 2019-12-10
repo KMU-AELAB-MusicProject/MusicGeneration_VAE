@@ -168,7 +168,7 @@ class Train(object):
 
         if args.train_phrase:
             train_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(76)]
-            test_file = os.path.join(DATA_PATH, 'bar_data', 'phrase_data76.npz')
+            test_file = os.path.join(DATA_PATH, 'phrase_data', 'phrase_data76.npz')
         else:
             train_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(76)]
             test_file = os.path.join(DATA_PATH, 'bar_data', 'bar_data76.npz')
