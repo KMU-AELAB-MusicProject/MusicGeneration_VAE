@@ -117,7 +117,7 @@ class Train(object):
                     with tf.GradientTape() as d_tape, tf.GradientTape() as q_tape, tf.GradientTape() as e_tape,\
                             tf.GradientTape() as n_tape, tf.GradientTape() as disc_tape:
                         train_data, pre_phrase, position_number = one_batch
-                        outputs, z, z_q, z_pre, z_pre_q df_logit, dr_logit = self.model(train_data, pre_phrase,
+                        outputs, z, z_q, z_pre, z_pre_q, df_logit, dr_logit = self.model(train_data, pre_phrase,
                                                                                         position_number)
 
                         g_loss = tf.keras.backend.sum(self.gan_loss(df_logit))
@@ -190,7 +190,7 @@ class Train(object):
             random.shuffle(train_list)
             for file in train_list[:int(len(train_list) * 0.6)]:
                 dataset = set_data(file, BATCH_SIZE)
-                t_loss, d_loss = batch(dataset)
+                t_loss, d_loss = batch(dataset, epoch)
                 train_loss += t_loss
                 train_loss_d += d_loss
             train_time = time.time() - train_time
@@ -202,7 +202,7 @@ class Train(object):
             test_loss = 0.
             for file in test_list:
                 dataset = set_data_test(file, BATCH_SIZE)
-                t_loss, _ = batch(dataset, False)
+                t_loss, _ = batch(dataset, epoch, False)
                 test_loss += t_loss
             with self.summary_writer.as_default():
                 tf.summary.scalar('test_loss', test_loss / len(test_list), step=epoch)
