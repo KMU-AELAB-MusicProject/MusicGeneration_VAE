@@ -92,7 +92,7 @@ class Train(object):
 
     @tf.function
     def additional_loss(self, targets, outputs):
-        loss = targets - outputs
+        loss = targets - tf.reshape(outputs, [-1, outputs.shape[-3], outputs.shape[-2]])
 
         return tf.keras.backend.sum(tf.keras.backend.clip(loss, 0., 1.))
 
@@ -111,42 +111,55 @@ class Train(object):
     def train(self):
         def batch(ds, isTrain=True):
             loss = np.float64(0.0)
-            dis_loss = np.float64(0.0)
+            disc_loss = np.float64(0.0)
 
             for one_batch in ds:
                 with tf.device('/device:GPU:0'):
-                    with tf.GradientTape() as tape:
+                    with tf.GradientTape() as d_tape, tf.GradientTape() as q_tape, tf.GradientTape() as e_tape, tf.GradientTape() as n_tape, tf.GradientTape() as disc_tape:
                         train_data, pre_phrase, position_number = one_batch
                         outputs, z, z_q, df_logit, dr_logit = self.model(train_data, pre_phrase, position_number)
 
-                        d_loss = tf.reduce_mean(self.bc_loss(train_data, outputs) +
-                                                self.additional_loss(train_data, outputs) * 0.5)
-                        q_loss = tf.reduce_mean(self.mse_loss(tf.stop_gradient(z), z_q))
-                        e_loss = tf.reduce_mean(self.mse_loss(tf.stop_gradient(z_q), z) * 0.22)
-                        g_loss = self.gan_loss(df_logit)
+                        g_loss = tf.keras.backend.sum(self.gan_loss(df_logit))
+                        d_loss = tf.keras.backend.sum(self.bc_loss(train_data, outputs) + self.additional_loss(train_data, outputs) * 0.5) + g_loss
+                        q_loss = tf.keras.backend.sum(self.mse_loss(tf.stop_gradient(z), z_q)) + g_loss * 0.2
+                        e_loss = tf.keras.backend.sum(self.mse_loss(tf.stop_gradient(z_q), z) * 0.22) + g_loss * 0.2
+                        n_loss = (d_loss + q_loss + e_loss) * 0.8
 
-                        l = self.discriminator_loss(df_logit, dr_logit)
+                        l = tf.keras.backend.sum(self.discriminator_loss(df_logit, dr_logit))
 
                     if isTrain:
-                        gradients = tape.gradient(l, self.model.discriminator.trainable_variables)
-                        vars = list(zip(gradients, self.model.trainable_variables))
+                        d_gradients = d_tape.gradient(d_loss, self.model.decoder.trainable_variables)
+                        q_gradients = q_tape.gradient(q_loss, self.model.quantisation.trainable_variables)
+                        e_gradients = e_tape.gradient(e_loss, self.model.encoder.trainable_variables)
+                        n_gradients = n_tape.gradient(n_loss, self.model.phrase_number.trainable_variables)
 
+                        disc_gradients = disc_tape.gradient(l, self.model.discriminator.trainable_variables)
+                        
+                        print(d_gradients)
+                        print(self.model.decoder.trainable_variables)
+                        print(q_gradients)
+                        print(self.model.quantisation.trainable_variables)
+                        print(e_gradients)
+                        print(self.model.encoder.trainable_variables)
+                        print(n_gradients)
+                        print(self.model.phrase_number.trainable_variables)
+                        print(disc_gradients)
+                        print(self.model.discriminator.trainable_variables)
+
+                        d_vars = list(zip(d_gradients, self.model.decoder.trainable_variables))
+                        q_vars = list(zip(q_gradients, self.model.quantisation.trainable_variables))
+                        e_vars = list(zip(e_gradients, self.model.encoder.trainable_variables))
+                        n_vars = list(zip(n_gradients, self.model.phrase_number.trainable_variables))
+
+                        vars = list(zip(disc_gradients, self.model.discriminator.trainable_variables))
+
+                        self.optimizer.apply_gradients(d_vars + q_vars + e_vars + n_vars)
                         self.optimizer_d.apply_gradients(vars)
 
-                        d_gradients = tape.gradient(d_loss + g_loss, self.model.trainable_variables)
-                        q_gradients = tape.gradient(q_loss + g_loss * 0.2, self.model.trainable_variables)
-                        e_gradients = tape.gradient(e_loss + g_loss * 0.2, self.model.trainable_variables)
-
-                        d_vars = list(zip(d_gradients, self.model.trainable_variables))
-                        q_vars = list(zip(q_gradients, self.model.trainable_variables))
-                        e_vars = list(zip(e_gradients, self.model.trainable_variables))
-
-                        self.optimizer.apply_gradients(d_vars + q_vars + e_vars)
-
                     loss += d_loss + q_loss + e_loss + g_loss
-                    dis_loss += l
+                    disc_loss += l
 
-            return loss, dis_loss
+            return loss, disc_loss
 
         def test(ds):
             output = np.zeros([10, 10, 3])
