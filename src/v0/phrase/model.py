@@ -24,15 +24,16 @@ class PhraseModel(tf.keras.Model):
     def vq(self, z):
         with tf.name_scope("vq"):
             z = tf.expand_dims(z, -2)  # (B, t, 1, D)
-            lookup_table_ = tf.reshape(self.quantisation, [1, 1, 128, 510])  # (1, 1, K, D)
-            dist = tf.norm(z - lookup_table_, axis=-1)  # Broadcasting -> (B, T', K)
+            print(self.quantisation(np.array([i for i in range(128)])))
+            lookup_table = tf.reshape(self.quantisation(np.array([i for i in range(128)])), [128, 510])  # (1, 1, K, D)
+            dist = tf.norm(z - lookup_table, axis=-1)  # Broadcasting -> (B, T', K)
             k = tf.argmin(dist, axis=-1)  # (B, t)
 
-            return tf.gather(self.quantisation, k)  # (B, t, D)
+            return self.quantisation(k)  # (B, t, D)
 
     def call(self, train_data, pre_phrase, position_number):
-        z, z_mean, z_var = self.encoder(train_data)  # train-phrase
-        z_pre, _, _ = self.encoder(pre_phrase)  # pre-phrase
+        z = self.encoder(train_data)  # train-phrase
+        z_pre = self.encoder(pre_phrase)  # pre-phrase
 
         z_q = self.vq(z)
         z_pre_q = self.vq(z_pre)
