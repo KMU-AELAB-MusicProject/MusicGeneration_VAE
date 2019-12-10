@@ -167,11 +167,11 @@ class Train(object):
             return output
 
         if args.train_phrase:
-            train_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(75)]
-            test_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(75, 77)]
+            train_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(76)]
+            test_file = os.path.join(DATA_PATH, 'bar_data', 'phrase_data76.npz')
         else:
-            train_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(75)]
-            test_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(75, 77)]
+            train_list = [os.path.join(DATA_PATH, 'bar_data', 'bar_data{}.npz'.format(i)) for i in range(76)]
+            test_file = os.path.join(DATA_PATH, 'bar_data', 'bar_data76.npz')
 
         batch = tf.function(batch)
         test = tf.function(test)
@@ -188,65 +188,61 @@ class Train(object):
             train_loss_d = 0.
             train_time = time.time()
             random.shuffle(train_list)
-            for file in train_list[:int(len(train_list) * 0.6)]:
+            for file in train_list[:int(len(train_list) * 0.8)]:
                 dataset = set_data(file, BATCH_SIZE)
                 t_loss, d_loss = batch(dataset, epoch)
                 train_loss += t_loss
                 train_loss_d += d_loss
             train_time = time.time() - train_time
             with self.summary_writer.as_default():
-                tf.summary.scalar('train_loss', train_loss / int(len(train_list) * 0.6), step=epoch)
-                tf.summary.scalar('train_loss_disc', train_loss_d / int(len(train_list) * 0.6), step=epoch)
+                tf.summary.scalar('train_loss', train_loss / int(len(train_list) * 0.8), step=epoch)
+                tf.summary.scalar('train_loss_disc', train_loss_d / int(len(train_list) * 0.8), step=epoch)
 
             # ---------------- test step ----------------
             test_loss = 0.
-            for file in test_list:
-                dataset = set_data_test(file, BATCH_SIZE)
-                t_loss, _ = batch(dataset, epoch, False)
-                test_loss += t_loss
+            dataset = set_data_test(test_file, BATCH_SIZE)
+            t_loss, _ = batch(dataset, epoch, False)
             with self.summary_writer.as_default():
-                tf.summary.scalar('test_loss', test_loss / len(test_list), step=epoch)
+                tf.summary.scalar('test_loss', t_loss, step=epoch)
 
-            if self.state_num:
-                # ---------------- piano-roll generation step ----------------
-                dataset = set_data_test(train_list[0], BATCH_SIZE)
-                output = test(dataset)
-                with self.summary_writer.as_default():
-                    tf.summary.image('train_output', output*255, step=epoch)
+            # ---------------- piano-roll generation step ----------------
+            dataset = set_data_test(train_list[0], BATCH_SIZE)
+            output = test(dataset)
+            with self.summary_writer.as_default():
+                tf.summary.image('train_output', output*255, step=epoch)
 
-                dataset = set_data(test_list[0], BATCH_SIZE)
-                output = test(dataset)
-                with self.summary_writer.as_default():
-                    tf.summary.image('test_output', output*255, step=epoch)
+            dataset = set_data(test_file, BATCH_SIZE)
+            output = test(dataset)
+            with self.summary_writer.as_default():
+                tf.summary.image('test_output', output*255, step=epoch)
 
-                outputs = []
-                pre_phrase = np.zeros([1, 384, 96], dtype=np.float64)
-                phrase_idx = np.array([[330]], dtype=np.float64)
-                for idx in range(3):
-                    pre_phrase = self.model.test(pre_phrase, phrase_idx)
-                    outputs.append(pre_phrase)
-                    phrase_idx = np.array([[1 - idx]], dtype=np.float64)
-                with self.summary_writer.as_default():
-                    tf.summary.image('output', np.array(outputs).reshape([-1, 384, 96, 1])*255, step=epoch)
+            outputs = []
+            pre_phrase = np.zeros([1, 384, 96], dtype=np.float64)
+            phrase_idx = np.array([[330]], dtype=np.float64)
+            for idx in range(3):
+                pre_phrase = self.model.test(pre_phrase, phrase_idx)
+                outputs.append(pre_phrase)
+                phrase_idx = np.array([[1 - idx]], dtype=np.float64)
+            with self.summary_writer.as_default():
+                tf.summary.image('output', np.array(outputs).reshape([-1, 384, 96, 1])*255, step=epoch)
 
-                if train_loss > past:
-                    self.not_learning_cnt += 1
-                past = train_loss
-
-                if test_loss < self.best_loss:
-                    self.best_loss = test_loss
-                    if epoch > 10:
-                        save_path = self.manager.save()
-                        print("Saved checkpoint for epoch {}: {} ---- loss: {}".format(epoch, save_path,
+            if test_loss < self.best_loss:
+                self.best_loss = test_loss
+                if epoch > 10:
+                    save_path = self.manager.save()
+                    print("Saved checkpoint for epoch {}: {} ---- loss: {}".format(epoch, save_path,
                                                                                        self.best_loss))
-            else:
-                if train_loss > past_d:
-                    self.not_learning_cnt_d += 1
-                past_d = train_loss
+            if (epoch > 18) and (train_loss_d > past_d):
+                self.not_learning_cnt_d += 1
+            past_d = train_loss_d
+
+            if train_loss > past:
+                self.not_learning_cnt += 1
+            past = train_loss
 
             # --------------------------------------------
-            print("{} Epoch {}state loss: [train_loss: {:.7f} | test_loss: {:.7f}] ---- time: {:.5f} | lr: {:.8f}".
-                  format(epoch, self.state_num, train_loss, test_loss, train_time, self.lr))
+            print("{} Epoch loss: [train_loss: {:.7f} | test_loss: {:.7f}] ---- time: {:.5f} | lr: {:.8f}".
+                  format(epoch, train_loss, test_loss, train_time, self.lr))
 
         return True
 
