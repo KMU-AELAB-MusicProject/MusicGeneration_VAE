@@ -51,7 +51,7 @@ class PhraseModel(tf.keras.Model):
         return z
 
     def test(self, pre_phrase, position_number):
-        z_pre, _, _ = self.encoder(pre_phrase)
+        z_pre = self.encoder(pre_phrase)
         z_pre_q = self.vq(z_pre)
         z_q = self.vq(tf.random.normal(shape=(1, 510), dtype=tf.float64))
         logits = self.decoder(z_q + z_pre_q + Reshape(target_shape=[510])(self.phrase_number(position_number)))
