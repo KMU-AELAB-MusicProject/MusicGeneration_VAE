@@ -149,14 +149,12 @@ class Train(object):
 
             return d_loss + q_loss + e_loss + g_loss, l
 
-        def test(ds):
+        def test(train_data, pre_phrase, position_number):
             output = np.zeros([10, 10, 3])
-            for one_batch in ds:
-                with tf.device('/device:GPU:0'):
-                    train_data, pre_phrase, position_number = one_batch
-                    outputs, z, z_q, df_logit, dr_logit = self.model(train_data, pre_phrase, position_number)
-                    output = outputs
-                return output
+            with tf.device('/device:GPU:0'):
+                outputs, _, _, _, _, _, _ = self.model(train_data, pre_phrase, position_number)
+                output = outputs
+            return output
 
         if args.train_phrase:
             train_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(76)]
@@ -204,14 +202,20 @@ class Train(object):
 
             # ---------------- piano-roll generation step ----------------
             dataset = set_data_test(train_list[0], BATCH_SIZE)
-            output = test(dataset)
-            with self.summary_writer.as_default():
-                tf.summary.image('train_output', output*255, step=epoch)
+            for ds in dataset:
+                train_data, pre_phrase, position_number = ds
+                output = test(train_data, pre_phrase, position_number)
+                with self.summary_writer.as_default():
+                    tf.summary.image('train_output', output*255, step=epoch)
+                break
 
             dataset = set_data(test_file, BATCH_SIZE)
-            output = test(dataset)
-            with self.summary_writer.as_default():
-                tf.summary.image('test_output', output*255, step=epoch)
+            for ds in dataset:
+                train_data, pre_phrase, position_number = ds
+                output = test(train_data, pre_phrase, position_number)
+                with self.summary_writer.as_default():
+                    tf.summary.image('test_output', output*255, step=epoch)
+                break
 
             outputs = []
             pre_phrase = np.zeros([1, 384, 96], dtype=np.float64)
@@ -223,12 +227,12 @@ class Train(object):
             with self.summary_writer.as_default():
                 tf.summary.image('output', np.array(outputs).reshape([-1, 384, 96, 1])*255, step=epoch)
 
-            if test_loss < self.best_loss:
-                self.best_loss = test_loss
+            if test_loss < self.test_best_loss:
+                self.test_best_loss = test_loss
                 if epoch > 10:
                     save_path = self.manager.save()
                     print("Saved checkpoint for epoch {}: {} ---- loss: {}".format(epoch, save_path,
-                                                                                       self.best_loss))
+                                                                                       self.test_best_loss))
             if (epoch > 18) and (train_loss_d > past_d):
                 self.not_learning_cnt_d += 1
             past_d = train_loss_d
