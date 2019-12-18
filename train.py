@@ -178,7 +178,7 @@ class Train(object):
         past_d = 999999999.
         print('################### start train ###################')
         for epoch in range(1, self.epochs + 1):
-            self.decay()
+            self.decay(epoch)
             self.optimizer.learning_rate = self.lr
 
             # ---------------- train step ----------------
