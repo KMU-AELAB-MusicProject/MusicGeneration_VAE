@@ -67,7 +67,7 @@ class Train(object):
         self.state_num = 1
 
         self.lr = 0.00008
-        self.lr_d = 0.00008
+        self.lr_d = 0.0001
 
         self.bc_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True, reduction=tf.keras.losses.Reduction.NONE)
         self.optimizer = tf.keras.optimizers.Adam(self.lr)
@@ -83,11 +83,20 @@ class Train(object):
 
         self.model = model
 
-    def decay(self):
+    def decay(self, epoch):
         if self.not_learning_cnt > self.not_learning_limit:
             self.lr *= 0.6
             self.not_learning_cnt = 0
             self.not_learning_limit += 2
+
+        if epoch <= 20:
+            self.lr_d = 0
+            self.not_learning_cnt_d = 0
+        else:
+            if self.not_learning_cnt_d > self.not_learning_limit_d:
+                self.lr_d *= 0.6
+                self.not_learning_cnt_d = 0
+                self.not_learning_limit_d += 2
 
     @tf.function
     def additional_loss(self, targets, outputs):
@@ -108,23 +117,23 @@ class Train(object):
         return loss
 
     def train(self):
-        def batch(train_data, pre_phrase, position_number, epoch, isTrain=True):
+        def batch(train_data, pre_phrase, position_number, isTrain=True):
             with tf.device('/device:GPU:0'):
                 with tf.GradientTape() as d_tape, tf.GradientTape() as q_tape, tf.GradientTape() as e_tape,\
                         tf.GradientTape() as n_tape, tf.GradientTape() as disc_tape:
                     outputs, z, z_q, z_pre, z_pre_q, df_logit, dr_logit = self.model(train_data, pre_phrase,
                                                                                     position_number)
 
-                    g_loss = tf.keras.backend.sum(self.gan_loss(df_logit))
+                    g_loss = tf.keras.backend.sum(self.gan_loss(df_logit)) * 1.5
                     recon_loss = tf.keras.backend.sum(self.bc_loss(train_data, outputs))
 
                     d_loss = recon_loss + self.additional_loss(train_data, outputs) * 0.5 + g_loss
                     q_loss = tf.keras.backend.sum(tf.math.squared_difference(tf.stop_gradient(z), z_q)) + \
-                             tf.keras.backend.sum(tf.math.squared_difference(tf.stop_gradient(z_pre), z_pre_q))
+                             tf.keras.backend.sum(tf.math.squared_difference(tf.stop_gradient(z_pre), z_pre_q)) + g_loss
                     e_loss = recon_loss + \
                              (tf.keras.backend.sum(tf.math.squared_difference(tf.stop_gradient(z_q), z)) +
                               tf.keras.backend.sum(tf.math.squared_difference(tf.stop_gradient(z_pre_q), z_pre))) * 0.22
-                    n_loss = (d_loss + q_loss + e_loss) * 0.8
+                    n_loss = (d_loss + q_loss + e_loss) * 0.5
 
                     l = tf.keras.backend.sum(self.discriminator_loss(df_logit, dr_logit))
 
@@ -141,11 +150,10 @@ class Train(object):
 
                     self.optimizer.apply_gradients(d_vars + q_vars + e_vars + n_vars)
 
-                    if (epoch > 18) and (epoch % 2):
-                        disc_gradients = disc_tape.gradient(l, self.model.discriminator.trainable_variables)
-                        vars = list(zip(disc_gradients, self.model.discriminator.trainable_variables))
+                    disc_gradients = disc_tape.gradient(l, self.model.discriminator.trainable_variables)
+                    vars = list(zip(disc_gradients, self.model.discriminator.trainable_variables))
 
-                        self.optimizer_d.apply_gradients(vars)
+                    self.optimizer_d.apply_gradients(vars)
 
             return d_loss + q_loss + e_loss + g_loss, l
 
@@ -182,7 +190,7 @@ class Train(object):
                 dataset = set_data(file, BATCH_SIZE)
                 for ds in dataset:
                     train_data, pre_phrase, position_number = ds
-                    t_loss, d_loss = batch(train_data, pre_phrase, position_number, epoch)
+                    t_loss, d_loss = batch(train_data, pre_phrase, position_number)
                     train_loss += t_loss
                     train_loss_d += d_loss
             train_time = time.time() - train_time
@@ -195,7 +203,7 @@ class Train(object):
             dataset = set_data_test(test_file, BATCH_SIZE)
             for ds in dataset:
                 train_data, pre_phrase, position_number = ds
-                t_loss, _ = batch(train_data, pre_phrase, position_number, epoch, False)
+                t_loss, _ = batch(train_data, pre_phrase, position_number, False)
                 test_loss += t_loss
             with self.summary_writer.as_default():
                 tf.summary.scalar('test_loss', test_loss, step=epoch)
@@ -233,7 +241,7 @@ class Train(object):
                     save_path = self.manager.save()
                     print("Saved checkpoint for epoch {}: {} ---- loss: {}".format(epoch, save_path,
                                                                                        self.test_best_loss))
-            if (epoch > 18) and (train_loss_d > past_d):
+            if (epoch > 20) and (train_loss_d > past_d):
                 self.not_learning_cnt_d += 1
             past_d = train_loss_d
 
