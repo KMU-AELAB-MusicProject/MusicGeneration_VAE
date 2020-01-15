@@ -24,12 +24,9 @@ class PhraseModel(tf.keras.Model):
 
         logits = self.decoder(z + z_pre + Reshape(target_shape=[510])(self.phrase_number(position_number)))
 
-        reshape_logits = Reshape(target_shape=[384, 96])(logits)
-        binary_note = tf.cast(tf.keras.backend.greater(reshape_logits, 0.35), dtype=tf.float64)
-        outputs = multiply([binary_note, reshape_logits], dtype=tf.float64)
+        outputs = tf.keras.activations.sigmoid(logits)
 
-        return Reshape(target_shape=[384, 96, 1])(outputs), binary_note, z, z_mean, z_var, \
-               tf.cast(tf.keras.backend.greater(train_data, 0.35), dtype=tf.float64)
+        return outputs, z, z_mean, z_var
 
     def get_feature(self, input):
         z, _, _ = self.encoder(input)

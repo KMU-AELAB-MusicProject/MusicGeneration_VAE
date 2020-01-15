@@ -21,7 +21,7 @@ class Decoder(Layer):
 
         self.x6 = Conv2DTranspose(filters=16, kernel_size=[3, 3], strides=[2, 2], activation='relu', padding='same')
 
-        self.logit_fit = Conv2D(filters=1, kernel_size=[1, 1], strides=[1, 1], activation='sigmoid', padding='same')
+        self.logit_fit = Conv2D(filters=1, kernel_size=[1, 1], strides=[1, 1], padding='same')
 
     def call(self, input):
         x = Reshape(target_shape=[1, 1, 510])(input)

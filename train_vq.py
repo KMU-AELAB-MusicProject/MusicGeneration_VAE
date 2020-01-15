@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 
 from config import *
+from src.phrase_discriminator import PhraseDiscriminatorModel
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--train_phrase', help="Train Classifier model before train vae.", action='store_true')
@@ -49,7 +50,7 @@ def set_data_test(file, batch_size):
 
 
 class Train(object):
-    def __init__(self, model, save_path, save_path_d, board_path):
+    def __init__(self, model, model_d, save_path, save_path_d, board_path):
         self.epochs = TRAIN_EPOCH
 
         self.train_best_loss = 99999999
@@ -76,12 +77,13 @@ class Train(object):
         self.ckpt = tf.train.Checkpoint(optimizer=self.optimizer, model=model)
         self.manager = tf.train.CheckpointManager(self.ckpt, save_path, max_to_keep=50)
 
-        self.ckpt_d = tf.train.Checkpoint(optimizer=self.optimizer_d, model=model)
+        self.ckpt_d = tf.train.Checkpoint(optimizer=self.optimizer_d, model=model_d)
         self.manager_d = tf.train.CheckpointManager(self.ckpt_d, save_path_d, max_to_keep=50)
 
         self.summary_writer = tf.summary.create_file_writer(board_path)
 
         self.model = model
+        self.model_d = model_d
 
     def decay(self, epoch):
         if self.not_learning_cnt > self.not_learning_limit:
@@ -89,9 +91,11 @@ class Train(object):
             self.not_learning_cnt = 0
             self.not_learning_limit += 2
 
-        if epoch <= 20:
+        if epoch < 20:
             self.lr_d = 0
             self.not_learning_cnt_d = 0
+        elif epoch == 20:
+            self.lr_d = 0.0001
         else:
             if self.not_learning_cnt_d > self.not_learning_limit_d:
                 self.lr_d *= 0.6
@@ -121,8 +125,11 @@ class Train(object):
             with tf.device('/device:GPU:0'):
                 with tf.GradientTape() as d_tape, tf.GradientTape() as q_tape, tf.GradientTape() as e_tape,\
                         tf.GradientTape() as n_tape, tf.GradientTape() as disc_tape:
-                    outputs, z, z_q, z_pre, z_pre_q, df_logit, dr_logit = self.model(train_data, pre_phrase,
+                    outputs, z, z_q, z_pre, z_pre_q = self.model(train_data, pre_phrase,
                                                                                     position_number)
+
+                    df_logit = self.model_d(outputs)
+                    dr_logit = self.model_d(train_data)
 
                     g_loss = tf.keras.backend.sum(self.gan_loss(df_logit)) * 1.5
                     recon_loss = tf.keras.backend.sum(self.bc_loss(train_data, outputs))
@@ -150,8 +157,8 @@ class Train(object):
 
                     self.optimizer.apply_gradients(d_vars + q_vars + e_vars + n_vars)
 
-                    disc_gradients = disc_tape.gradient(l, self.model.discriminator.trainable_variables)
-                    vars = list(zip(disc_gradients, self.model.discriminator.trainable_variables))
+                    disc_gradients = disc_tape.gradient(l, self.model_d.trainable_variables)
+                    vars = list(zip(disc_gradients, self.model_d.trainable_variables))
 
                     self.optimizer_d.apply_gradients(vars)
 
@@ -239,6 +246,7 @@ class Train(object):
                 self.test_best_loss = test_loss
                 if epoch > 10:
                     save_path = self.manager.save()
+                    self.manager_d.save()
                     print("Saved checkpoint for epoch {}: {} ---- loss: {}".format(epoch, save_path,
                                                                                        self.test_best_loss))
             if (epoch > 20) and (train_loss_d > past_d):
@@ -267,6 +275,7 @@ if __name__ == '__main__':
         save_path = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number), 'phrase')
         save_path_d = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'phrase_discriminator')
         board_path = os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'phrase')
+        model_d = PhraseDiscriminatorModel()
     else:
         import_model = importlib.import_module('src.v{}.bar.model'.format(args.model_number))
         model = import_model.BarModel()
@@ -274,5 +283,5 @@ if __name__ == '__main__':
         save_path = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number), 'bar')
         board_path = os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'bar')
 
-    trainer = Train(model, save_path, save_path_d, board_path)
+    trainer = Train(model, model_d, save_path, save_path_d, board_path)
     trainer.train()

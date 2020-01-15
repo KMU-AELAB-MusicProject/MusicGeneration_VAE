@@ -41,10 +41,7 @@ class PhraseModel(tf.keras.Model):
 
         outputs = tf.keras.activations.sigmoid(logits)
 
-        df_logits = self.discriminator(outputs)
-        dr_logits = self.discriminator(train_data)
-
-        return outputs, z, z_q, z_pre, z_pre_q, df_logits, dr_logits
+        return outputs, z, z_q, z_pre, z_pre_q
 
     def get_feature(self, input):
         z, _, _ = self.encoder(input)
