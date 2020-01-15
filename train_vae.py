@@ -123,8 +123,7 @@ class Train(object):
     def train(self):
         def batch(train_data, pre_phrase, position_number, isTrain=True):
             with tf.device('/device:GPU:0'):
-                with tf.GradientTape() as d_tape, tf.GradientTape() as q_tape, tf.GradientTape() as e_tape,\
-                        tf.GradientTape() as n_tape, tf.GradientTape() as disc_tape:
+                with tf.GradientTape() as d_tape, tf.GradientTape() as disc_tape:
                     outputs, z, z_mean, z_var = self.model(train_data, pre_phrase, position_number)
 
                     df_logit = self.model_d(outputs)
