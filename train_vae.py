@@ -146,14 +146,14 @@ class Train(object):
                     disc_gradients = disc_tape.gradient(disc_loss, self.model_d.trainable_variables)
                     disc_vars = list(zip(disc_gradients, self.model.discriminator.trainable_variables))
 
-                    self.optimizer_d.apply_gradients(disc_vars )
+                    self.optimizer_d.apply_gradients(disc_vars)
 
             return loss, disc_loss
 
         def test(train_data, pre_phrase, position_number):
             output = np.zeros([10, 10, 3])
             with tf.device('/device:GPU:0'):
-                outputs, _, _, _, _, _, _ = self.model(train_data, pre_phrase, position_number)
+                outputs, _, _, _ = self.model(train_data, pre_phrase, position_number)
                 output = outputs
             return output
 

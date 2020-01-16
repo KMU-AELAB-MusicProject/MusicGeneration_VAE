@@ -167,7 +167,7 @@ class Train(object):
         def test(train_data, pre_phrase, position_number):
             output = np.zeros([10, 10, 3])
             with tf.device('/device:GPU:0'):
-                outputs, _, _, _, _, _, _ = self.model(train_data, pre_phrase, position_number)
+                outputs, _, _, _, _ = self.model(train_data, pre_phrase, position_number)
                 output = outputs
             return output
 
