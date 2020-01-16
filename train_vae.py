@@ -139,12 +139,12 @@ class Train(object):
 
                 if isTrain:
                     gradients = d_tape.gradient(loss, self.model.trainable_variables)
-                    vars = list(zip(gradients, self.model.decoder.trainable_variables))
+                    vars = list(zip(gradients, self.model.trainable_variables))
 
                     self.optimizer.apply_gradients(vars)
 
                     disc_gradients = disc_tape.gradient(disc_loss, self.model_d.trainable_variables)
-                    disc_vars = list(zip(disc_gradients, self.model.discriminator.trainable_variables))
+                    disc_vars = list(zip(disc_gradients, self.model_d.trainable_variables))
 
                     self.optimizer_d.apply_gradients(disc_vars)
 
