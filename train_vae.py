@@ -50,7 +50,7 @@ def set_data_test(file, batch_size):
 
 
 class Train(object):
-    def __init__(self, model, model_d, save_path, save_path_d, board_path):
+    def __init__(self, model, model_d, save_path, save_path_d, save_path_tb, board_path):
         self.epochs = TRAIN_EPOCH
 
         self.train_best_loss = 99999999
@@ -80,6 +80,9 @@ class Train(object):
         self.ckpt_d = tf.train.Checkpoint(optimizer=self.optimizer_d, model=model_d)
         self.manager_d = tf.train.CheckpointManager(self.ckpt_d, save_path_d, max_to_keep=50)
 
+        self.ckpt_tb = tf.train.Checkpoint(optimizer=self.optimizer, model=model)
+        self.manager_tb = tf.train.CheckpointManager(self.ckpt_tb, save_path_tb, max_to_keep=50)
+
         self.summary_writer = tf.summary.create_file_writer(board_path)
 
         self.model = model
@@ -91,10 +94,10 @@ class Train(object):
             self.not_learning_cnt = 0
             self.not_learning_limit += 2
 
-        if epoch < 20:
+        if epoch < 12:
             self.lr_d = 0
             self.not_learning_cnt_d = 0
-        elif epoch == 20:
+        elif epoch == 12:
             self.lr_d = 0.0001
         else:
             if self.not_learning_cnt_d > self.not_learning_limit_d:
@@ -235,13 +238,17 @@ class Train(object):
                     self.manager_d.save()
                     print("Saved checkpoint for epoch {}: {} ---- loss: {}".format(epoch, save_path,
                                                                                        self.test_best_loss))
-            if (epoch > 20) and (train_loss_d > past_d):
+            if (epoch >= 12) and (train_loss_d > past_d):
                 self.not_learning_cnt_d += 1
             past_d = train_loss_d
 
             if train_loss > past:
                 self.not_learning_cnt += 1
             past = train_loss
+
+            if train_loss < self.train_best_loss:
+                self.train_best_loss = train_loss
+                self.manager_tb.save()
 
             # --------------------------------------------
             print("{} Epoch loss: [train_loss: {:.7f} | test_loss: {:.7f}] ---- time: {:.5f} | lr: {:.8f}".
@@ -260,6 +267,7 @@ if __name__ == '__main__':
         model = import_model.PhraseModel()
         save_path = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number), 'phrase')
         save_path_d = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'phrase_discriminator')
+        save_path_tb = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number), 'phrase_train_best')
         board_path = os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'phrase')
         model_d = PhraseDiscriminatorModel()
     else:
@@ -269,5 +277,5 @@ if __name__ == '__main__':
         save_path = os.path.join(ROOT_PATH, MODEL_SAVE_PATH, 'v{}'.format(args.model_number), 'bar')
         board_path = os.path.join(ROOT_PATH, BOARD_PATH, 'v{}'.format(args.model_number), 'bar')
 
-    trainer = Train(model, model_d, save_path, save_path_d, board_path)
+    trainer = Train(model, model_d, save_path, save_path_d, save_path_tb, board_path)
     trainer.train()
