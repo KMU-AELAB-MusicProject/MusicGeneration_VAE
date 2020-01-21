@@ -140,7 +140,7 @@ class Train(object):
                     loss_d = tf.keras.backend.sum(self.discriminator_loss(df_logit, dr_logit))
 
                 if isTrain:
-                    gradients = d_tape.gradient(d_loss, self.model.trainable_variables)
+                    gradients = d_tape.gradient(loss, self.model.trainable_variables)
                     vars = list(zip(gradients, self.model.trainable_variables))
                     self.optimizer.apply_gradients(vars)
 
