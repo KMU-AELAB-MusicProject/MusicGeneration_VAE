@@ -123,53 +123,38 @@ class Train(object):
     def train(self):
         def batch(train_data, pre_phrase, position_number, isTrain=True):
             with tf.device('/device:GPU:0'):
-                with tf.GradientTape() as d_tape, tf.GradientTape() as q_tape, tf.GradientTape() as e_tape,\
-                        tf.GradientTape() as n_tape, tf.GradientTape() as disc_tape:
-                    outputs, z, z_q, z_pre, z_pre_q = self.model(train_data, pre_phrase,
+                with tf.GradientTape() as d_tape, tf.GradientTape() as disc_tape:
+                    outputs_ori, outputs_music, z, z_q, z_pre, z_pre_q = self.model(train_data, pre_phrase,
                                                                                     position_number)
 
-                    df_logit = self.model_d(outputs)
+                    df_logit = self.model_d(outputs_music)
                     dr_logit = self.model_d(train_data)
 
                     g_loss = tf.keras.backend.sum(self.gan_loss(df_logit)) * 1.5
-                    recon_loss = tf.keras.backend.sum(self.bc_loss(train_data, outputs))
+                    recon_loss = 0.4 * tf.keras.backend.sum(self.bc_loss(train_data, outputs_ori)) + \
+                                 0.6 * tf.keras.backend.sum(self.bc_loss(train_data, outputs_music))
 
-                    d_loss = recon_loss + self.additional_loss(train_data, outputs) * 0.5 + g_loss
-                    q_loss = tf.keras.backend.sum(tf.math.squared_difference(tf.stop_gradient(z), z_q)) + \
-                             tf.keras.backend.sum(tf.math.squared_difference(tf.stop_gradient(z_pre), z_pre_q)) + g_loss
-                    e_loss = recon_loss + \
-                             (tf.keras.backend.sum(tf.math.squared_difference(tf.stop_gradient(z_q), z)) +
-                              tf.keras.backend.sum(tf.math.squared_difference(tf.stop_gradient(z_pre_q), z_pre))) * 0.22
-                    n_loss = (d_loss + q_loss + e_loss) * 0.5
+                    loss = recon_loss + g_loss + ((self.additional_loss(train_data, outputs_ori) +
+                                                   self.additional_loss(train_data, outputs_music)) * 0.3)
 
-                    l = tf.keras.backend.sum(self.discriminator_loss(df_logit, dr_logit))
+                    loss_d = tf.keras.backend.sum(self.discriminator_loss(df_logit, dr_logit))
 
                 if isTrain:
-                    d_gradients = d_tape.gradient(d_loss, self.model.decoder.trainable_variables)
-                    q_gradients = q_tape.gradient(q_loss, self.model.quantisation.trainable_variables)
-                    e_gradients = e_tape.gradient(e_loss, self.model.encoder.trainable_variables)
-                    n_gradients = n_tape.gradient(n_loss, self.model.phrase_number.trainable_variables)
+                    gradients = d_tape.gradient(d_loss, self.model.trainable_variables)
+                    vars = list(zip(gradients, self.model.trainable_variables))
+                    self.optimizer.apply_gradients(vars)
 
-                    d_vars = list(zip(d_gradients, self.model.decoder.trainable_variables))
-                    q_vars = list(zip(q_gradients, self.model.quantisation.trainable_variables))
-                    e_vars = list(zip(e_gradients, self.model.encoder.trainable_variables))
-                    n_vars = list(zip(n_gradients, self.model.phrase_number.trainable_variables))
+                    disc_gradients = disc_tape.gradient(loss_d, self.model_d.trainable_variables)
+                    vars_d = list(zip(disc_gradients, self.model_d.trainable_variables))
+                    self.optimizer_d.apply_gradients(vars_d)
 
-                    self.optimizer.apply_gradients(d_vars + q_vars + e_vars + n_vars)
-
-                    disc_gradients = disc_tape.gradient(l, self.model_d.trainable_variables)
-                    vars = list(zip(disc_gradients, self.model_d.trainable_variables))
-
-                    self.optimizer_d.apply_gradients(vars)
-
-            return d_loss + q_loss + e_loss + g_loss, l
+            return loss, loss_d
 
         def test(train_data, pre_phrase, position_number):
-            output = np.zeros([10, 10, 3])
+            outputs = np.zeros([10, 10, 3])
             with tf.device('/device:GPU:0'):
-                outputs, _, _, _, _ = self.model(train_data, pre_phrase, position_number)
-                output = outputs
-            return output
+                _,outputs, _, _, _, _ = self.model(train_data, pre_phrase, position_number)
+            return outputs
 
         if args.train_phrase:
             train_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(76)]

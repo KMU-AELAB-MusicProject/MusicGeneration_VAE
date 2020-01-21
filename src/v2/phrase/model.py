@@ -24,9 +24,10 @@ class PhraseModel(tf.keras.Model):
 
         logits = self.decoder(z + z_pre + Reshape(target_shape=[510])(self.phrase_number(position_number)))
 
-        outputs = tf.keras.activations.sigmoid(logits)
+        outputs_ori = tf.keras.activations.sigmoid(logits)
+        outputs_music = tf.cast(tf.keras.backend.greater(outputs_ori, 0.35), dtype=tf.float64)
 
-        return outputs, z, z_mean, z_var
+        return outputs_ori, outputs_music, z, z_mean, z_var
 
     def get_feature(self, input):
         z, _, _ = self.encoder(input)

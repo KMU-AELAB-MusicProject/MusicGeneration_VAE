@@ -8,7 +8,6 @@ from tensorflow.keras.layers import Reshape, multiply, Embedding
 # from config import *
 from .encoder import Encoder
 from .decoder import Decoder
-from ...phrase_discriminator import PhraseDiscriminatorModel
 
 
 class PhraseModel(tf.keras.Model):
@@ -16,7 +15,6 @@ class PhraseModel(tf.keras.Model):
         super(PhraseModel, self).__init__(name='phrase_model')
         self.encoder = Encoder()
         self.decoder = Decoder()
-        self.discriminator = PhraseDiscriminatorModel()
 
         self.phrase_number = Embedding(332, 510, dtype=tf.float64, name='phrase_number')
         self.quantisation = Embedding(128, 510, dtype=tf.float64, name='quantisation')
@@ -39,9 +37,10 @@ class PhraseModel(tf.keras.Model):
 
         logits = self.decoder(z_q + z_pre_q + Reshape(target_shape=[510])(self.phrase_number(position_number)))
 
-        outputs = tf.keras.activations.sigmoid(logits)
+        outputs_ori = tf.keras.activations.sigmoid(logits)
+        outputs_music = tf.cast(tf.keras.backend.greater(outputs_ori, 0.35), dtype=tf.float64)
 
-        return outputs, z, z_q, z_pre, z_pre_q
+        return outputs_ori, outputs_music, z, z_q, z_pre, z_pre_q
 
     def get_feature(self, input):
         z, _, _ = self.encoder(input)

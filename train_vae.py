@@ -127,15 +127,17 @@ class Train(object):
         def batch(train_data, pre_phrase, position_number, isTrain=True):
             with tf.device('/device:GPU:0'):
                 with tf.GradientTape() as d_tape, tf.GradientTape() as disc_tape:
-                    outputs, z, z_mean, z_var = self.model(train_data, pre_phrase, position_number)
+                    outputs_ori, outputs_music, z, z_mean, z_var = self.model(train_data, pre_phrase, position_number)
 
-                    df_logit = self.model_d(outputs)
+                    df_logit = self.model_d(outputs_music)
                     dr_logit = self.model_d(train_data)
 
                     g_loss = tf.keras.backend.sum(self.gan_loss(df_logit)) * 1.5
-                    recon_loss = tf.keras.backend.sum(self.bc_loss(train_data, outputs))
+                    recon_loss = 0.4 * tf.keras.backend.sum(self.bc_loss(train_data, outputs_ori)) + \
+                                 0.6 * tf.keras.backend.sum(self.bc_loss(train_data, outputs_music))
 
-                    loss = recon_loss + self.additional_loss(train_data, outputs) * 0.5 + g_loss
+                    loss = recon_loss + g_loss + ((self.additional_loss(train_data, outputs_music) +
+                                                   self.additional_loss(train_data, outputs_ori)) * 0.3)
                     loss -= 0.5 * tf.reduce_mean(z_var - tf.square(z_mean) - tf.exp(z_var) + 1.)
 
                     disc_loss = tf.keras.backend.sum(self.discriminator_loss(df_logit, dr_logit))
@@ -154,11 +156,10 @@ class Train(object):
             return loss, disc_loss
 
         def test(train_data, pre_phrase, position_number):
-            output = np.zeros([10, 10, 3])
+            outputs = np.zeros([10, 10, 3])
             with tf.device('/device:GPU:0'):
-                outputs, _, _, _ = self.model(train_data, pre_phrase, position_number)
-                output = outputs
-            return output
+                _, outputs, _, _, _ = self.model(train_data, pre_phrase, position_number)
+            return outputs
 
         if args.train_phrase:
             train_list = [os.path.join(DATA_PATH, 'phrase_data', 'phrase_data{}.npz'.format(i)) for i in range(76)]
