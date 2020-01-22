@@ -123,7 +123,7 @@ class Train(object):
     def train(self):
         def batch(train_data, pre_phrase, position_number, isTrain=True):
             with tf.device('/device:GPU:0'):
-                with tf.GradientTape() as d_tape, tf.GradientTape() as disc_tape:
+                with tf.GradientTape() as tape, tf.GradientTape() as disc_tape, tf.GradientTape() as en_tape:
                     outputs_ori, outputs_music, z, z_q, z_pre, z_pre_q = self.model(train_data, pre_phrase,
                                                                                     position_number)
 
@@ -139,14 +139,23 @@ class Train(object):
 
                     loss_d = tf.keras.backend.sum(self.discriminator_loss(df_logit, dr_logit))
 
+                    loss_en = recon_loss + \
+                              (tf.keras.backend.sum(tf.math.squared_difference(tf.stop_gradient(z_q), z)) +
+                               tf.keras.backend.sum(tf.math.squared_difference(tf.stop_gradient(z_pre_q), z_pre))) * 0.22
+
+
                 if isTrain:
-                    gradients = d_tape.gradient(loss, self.model.trainable_variables)
+                    gradients = tape.gradient(loss, self.model.trainable_variables)
                     vars = list(zip(gradients, self.model.trainable_variables))
                     self.optimizer.apply_gradients(vars)
 
                     disc_gradients = disc_tape.gradient(loss_d, self.model_d.trainable_variables)
                     vars_d = list(zip(disc_gradients, self.model_d.trainable_variables))
                     self.optimizer_d.apply_gradients(vars_d)
+
+                    en_gradients = en_tape.gradient(loss_en, self.model.encoder.trainable_variables)
+                    vars_en = list(zip(en_gradients, self.model.encoder.trainable_variables))
+                    self.optimizer_d.apply_gradients(vars_en)
 
             return loss, loss_d
 
