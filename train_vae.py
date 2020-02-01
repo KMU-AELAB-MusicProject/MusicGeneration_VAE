@@ -113,31 +113,26 @@ class Train(object):
 
     @tf.function
     def gan_loss(self, logits):
-        loss = self.bc_loss(tf.ones_like(logits), logits)
-
-        return loss
+        return self.bc_loss(tf.ones_like(logits), logits)
 
     @tf.function
     def discriminator_loss(self, f_logits, r_logits):
-        loss = self.bc_loss(tf.ones_like(r_logits), r_logits) + self.bc_loss(tf.zeros_like(f_logits), f_logits)
-
-        return loss
+        return self.bc_loss(tf.ones_like(r_logits), r_logits) + self.bc_loss(tf.zeros_like(f_logits), f_logits)
 
     def train(self):
         def batch(train_data, pre_phrase, position_number, isTrain=True):
             with tf.device('/device:GPU:0'):
                 with tf.GradientTape() as d_tape, tf.GradientTape() as disc_tape:
-                    outputs_ori, outputs_music, z, z_mean, z_var = self.model(train_data, pre_phrase, position_number)
+                    _, outputs_music, z, z_mean, z_var = self.model(train_data, pre_phrase, position_number)
 
                     df_logit = self.model_d(outputs_music)
                     dr_logit = self.model_d(train_data)
 
                     g_loss = tf.keras.backend.sum(self.gan_loss(df_logit)) * 1.5
-                    recon_loss = 0.4 * tf.keras.backend.sum(self.bc_loss(train_data, outputs_ori)) + \
-                                 0.6 * tf.keras.backend.sum(self.bc_loss(train_data, outputs_music))
+                    recon_loss = tf.keras.backend.sum(self.bc_loss(train_data, outputs_music))
 
-                    loss = recon_loss + g_loss + ((self.additional_loss(train_data, outputs_music) +
-                                                   self.additional_loss(train_data, outputs_ori)) * 0.3)
+                    loss = recon_loss + g_loss
+
                     loss -= 0.5 * tf.reduce_mean(z_var - tf.square(z_mean) - tf.exp(z_var) + 1.)
 
                     disc_loss = tf.keras.backend.sum(self.discriminator_loss(df_logit, dr_logit))
@@ -179,6 +174,7 @@ class Train(object):
             self.optimizer.learning_rate = self.lr
 
             # ---------------- train step ----------------
+            cnt = 0
             train_loss = 0.
             train_loss_d = 0.
             train_time = time.time()
@@ -190,18 +186,24 @@ class Train(object):
                     loss, disc_loss = batch(train_data, pre_phrase, position_number)
                     train_loss += loss
                     train_loss_d += disc_loss
+                    cnt += 1
             train_time = time.time() - train_time
+            train_loss /= cnt
+            train_loss_d /= cnt
             with self.summary_writer.as_default():
-                tf.summary.scalar('train_loss', train_loss / int(len(train_list) * 0.8), step=epoch)
-                tf.summary.scalar('train_loss_disc', train_loss_d / int(len(train_list) * 0.8), step=epoch)
+                tf.summary.scalar('train_loss', train_loss, step=epoch)
+                tf.summary.scalar('train_loss_disc', train_loss_d, step=epoch)
 
             # ---------------- test step ----------------
+            cnt = 0
             test_loss = 0.
             dataset = set_data_test(test_file, BATCH_SIZE)
             for ds in dataset:
                 train_data, pre_phrase, position_number = ds
                 t_loss, _ = batch(train_data, pre_phrase, position_number, False)
                 test_loss += t_loss
+                cnt += 1
+            test_loss /= cnt
             with self.summary_writer.as_default():
                 tf.summary.scalar('test_loss', test_loss, step=epoch)
 
@@ -224,11 +226,10 @@ class Train(object):
 
             outputs = []
             pre_phrase = np.zeros([1, 384, 96], dtype=np.float64)
-            phrase_idx = np.array([[330]], dtype=np.float64)
+            phrase_idx = [330, 8, 7]
             for idx in range(3):
-                pre_phrase = self.model.test(pre_phrase, phrase_idx)
+                pre_phrase = self.model.test(pre_phrase, np.array([[330]], dtype=np.float64))
                 outputs.append(pre_phrase)
-                phrase_idx = np.array([[1 - idx]], dtype=np.float64)
             with self.summary_writer.as_default():
                 tf.summary.image('output', np.array(outputs).reshape([-1, 384, 96, 1])*255, step=epoch)
 
